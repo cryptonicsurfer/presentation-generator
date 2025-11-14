@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Download, Eye, Sparkles } from 'lucide-react';
+import { Loader2, Download, Eye, Sparkles, Maximize2 } from 'lucide-react';
 
 type StatusUpdate = {
   type: 'status' | 'tool' | 'thinking' | 'error' | 'complete';
@@ -112,6 +112,21 @@ export default function PresentationGenerator() {
       doc.open();
       doc.write(generatedHTML);
       doc.close();
+    }
+  };
+
+  const handleFullscreen = () => {
+    if (!iframeRef.current) return;
+
+    const iframe = iframeRef.current;
+
+    // Try to request fullscreen on the iframe
+    if (iframe.requestFullscreen) {
+      iframe.requestFullscreen();
+    } else if ((iframe as any).webkitRequestFullscreen) {
+      (iframe as any).webkitRequestFullscreen();
+    } else if ((iframe as any).msRequestFullscreen) {
+      (iframe as any).msRequestFullscreen();
     }
   };
 
@@ -240,6 +255,10 @@ export default function PresentationGenerator() {
                       <Button onClick={handlePreview} variant="outline" className="flex-1">
                         <Eye className="w-4 h-4" />
                         Visa
+                      </Button>
+                      <Button onClick={handleFullscreen} variant="outline" className="flex-1">
+                        <Maximize2 className="w-4 h-4" />
+                        Fullscreen
                       </Button>
                       <Button onClick={handleDownload} className="flex-1">
                         <Download className="w-4 h-4" />
