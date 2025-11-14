@@ -1,11 +1,12 @@
 'use client';
 
+import type { CSSProperties, ReactNode } from 'react';
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Download, Eye, Sparkles, Maximize2 } from 'lucide-react';
+import { Loader2, Download, Eye, Sparkles, Maximize2, FileJson } from 'lucide-react';
 
 type StatusUpdate = {
   type: 'status' | 'tool' | 'thinking' | 'error' | 'complete';
@@ -13,11 +14,39 @@ type StatusUpdate = {
   html?: string;
   title?: string;
   slideCount?: number;
+  toolCallsLogUrl?: string;
   presentationData?: {
     title: string;
     sections: string[];
   };
 };
+
+type ShimmerContainerProps = {
+  active?: boolean;
+  radius?: string;
+  className?: string;
+  children: ReactNode;
+};
+
+function ShimmerContainer({ active, radius = '1.5rem', className, children }: ShimmerContainerProps) {
+  if (!active) {
+    if (className) {
+      return <div className={className}>{children}</div>;
+    }
+    return <>{children}</>;
+  }
+
+  return (
+    <div className="shimmer-border-wrapper" style={{ '--shimmer-radius': radius, padding: '3px' } as CSSProperties}>
+      <div className="shimmer-border-bg">
+        <div className="shimmer-gradient-rotate" />
+      </div>
+      <div className={className} style={{ position: 'relative', zIndex: 1, borderRadius: `calc(${radius} - 3px)` }}>
+        {children}
+      </div>
+    </div>
+  );
+}
 
 export default function PresentationGenerator() {
   const [prompt, setPrompt] = useState('');
@@ -28,6 +57,7 @@ export default function PresentationGenerator() {
   const [presentationData, setPresentationData] = useState<{ title: string; sections: string[] } | null>(null);
   const [tweakPrompt, setTweakPrompt] = useState('');
   const [isTweaking, setIsTweaking] = useState(false);
+  const [toolCallsLogUrl, setToolCallsLogUrl] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const examplePrompts = [
@@ -41,6 +71,11 @@ export default function PresentationGenerator() {
     'Lägg till en slide med finansiell jämförelse mot föregående år',
     'Gör texten större och mer lättläst',
   ];
+
+  const shouldHighlightPrompt = isGenerating && !isTweaking;
+  const shouldHighlightStatus = isGenerating || isTweaking;
+  const shouldHighlightPreview = isTweaking;
+  const shouldHighlightTweakArea = isTweaking;
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
@@ -104,6 +139,9 @@ export default function PresentationGenerator() {
                   setPresentationTitle(data.title || 'Presentation');
                   if (data.presentationData) {
                     setPresentationData(data.presentationData);
+                  }
+                  if (data.toolCallsLogUrl) {
+                    setToolCallsLogUrl(data.toolCallsLogUrl);
                   }
                 }
               }
@@ -232,6 +270,9 @@ export default function PresentationGenerator() {
                     if (data.presentationData) {
                       setPresentationData(data.presentationData);
                     }
+                    if (data.toolCallsLogUrl) {
+                      setToolCallsLogUrl(data.toolCallsLogUrl);
+                    }
                   } catch (decodeError) {
                     console.error('Failed to decode Base64 HTML:', decodeError);
                   }
@@ -261,7 +302,7 @@ export default function PresentationGenerator() {
         {/* Header */}
         <div className="text-center mb-6">
           <div className="flex items-center justify-center gap-3 mb-2">
-            <Sparkles className="w-10 h-10 text-blue-600" />
+            <Sparkles className="w-10 h-10 text-gray-600" />
             <h1 className="text-5xl font-bold text-gray-900">Presentation Generator</h1>
           </div>
         </div>
@@ -269,6 +310,7 @@ export default function PresentationGenerator() {
         <div className="grid grid-cols-1 xl:grid-cols-5 gap-8">
           {/* Left Column: Input */}
           <div className="xl:col-span-2 space-y-6">
+            <ShimmerContainer active={shouldHighlightPrompt}>
             <Card>
               <CardHeader>
                 <CardTitle>Vad vill du skapa?</CardTitle>
@@ -324,9 +366,11 @@ export default function PresentationGenerator() {
                 </Button>
               </CardContent>
             </Card>
+            </ShimmerContainer>
 
             {/* Status Updates */}
             {statusUpdates.length > 0 && (
+              <ShimmerContainer active={shouldHighlightStatus}>
               <Card>
                 <CardHeader>
                   <CardTitle>Status</CardTitle>
@@ -357,11 +401,13 @@ export default function PresentationGenerator() {
                   </div>
                 </CardContent>
               </Card>
+              </ShimmerContainer>
             )}
           </div>
 
           {/* Right Column: Preview */}
           <div className="xl:col-span-3">
+            <ShimmerContainer active={shouldHighlightPreview} radius="1.75rem">
             <Card className="h-full">
               <CardHeader>
                 <CardTitle>Förhandsvisning</CardTitle>
@@ -388,6 +434,23 @@ export default function PresentationGenerator() {
                         Ladda ner HTML
                       </Button>
                     </div>
+{/* 
+                    {toolCallsLogUrl && (
+                      <div className="mt-2">
+                        <Button
+                          onClick={() => window.open(toolCallsLogUrl, '_blank')}
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                        >
+                          <FileJson className="w-4 h-4" />
+                          Visa Tool Calls Log (JSON)
+                        </Button>
+                        <p className="text-xs text-gray-500 mt-1 text-center">
+                          Verifiera vilken data Claude faktiskt hämtade från CRM/databaser
+                        </p>
+                      </div>
+                    )} */}
 
                     <div className="w-full aspect-[16/9] border-2 border-gray-200 rounded-lg overflow-hidden bg-white shadow-2xl">
                       <iframe
@@ -408,7 +471,9 @@ export default function PresentationGenerator() {
                 )}
 
                 {/* Tweak Presentation - Always visible, disabled until presentation is ready */}
-                <div className="mt-6 pt-6 border-t border-gray-200">
+                <div className="mt-6">
+                  <ShimmerContainer active={shouldHighlightTweakArea} radius="1.25rem">
+                  <div className="pt-6 border-t border-gray-200">
                   <h3 className={`text-lg font-semibold mb-2 ${!generatedHTML ? 'text-gray-400' : 'text-gray-900'}`}>
                     Justera Presentation (efter generering är gjord)
                   </h3>
@@ -465,8 +530,11 @@ export default function PresentationGenerator() {
                     </Button>
                   </div>
                 </div>
+                  </ShimmerContainer>
+                </div>
               </CardContent>
             </Card>
+            </ShimmerContainer>
           </div>
         </div>
       </div>
