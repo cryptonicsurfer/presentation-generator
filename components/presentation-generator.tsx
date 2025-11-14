@@ -26,7 +26,7 @@ export default function PresentationGenerator() {
   const examplePrompts = [
     'Skapa en företagsrapport för Randek AB',
     'KPI-översikt för Falkenberg Q4 2024',
-    'Analys av matproduktion i Halland',
+    'Gör en presentation som hämtar finansiell data från vår databas och kontakter och möten från crm-systemet om företaget:',
   ];
 
   const handleGenerate = async () => {

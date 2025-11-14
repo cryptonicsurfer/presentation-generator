@@ -34,10 +34,11 @@ export async function POST(req: NextRequest) {
 
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'status', message: 'Ansluter till databaser...' })}\n\n`));
 
-        // Track what Claude is doing
-        let lastToolUsed = '';
+        // Track sections
         let sections: string[] = [];
-
+        
+        // claude-sonnet-4-5-20250929
+        // claude-haiku-4-5-20251001
         // Run the query with Claude
         const queryInstance = query({
           prompt: userPrompt,
@@ -62,6 +63,14 @@ export async function POST(req: NextRequest) {
           },
         });
 
+        // Tool name to user-friendly message mapping
+        const toolMessages: Record<string, string> = {
+          'mcp__fbg-data-access__search_directus_companies': 'Söker efter företag i CRM-systemet...',
+          'mcp__fbg-data-access__query_fbg_analytics': 'Hämtar finansiell data från databas...',
+          'mcp__fbg-data-access__count_directus_meetings': 'Räknar antal möten med företaget...',
+          'mcp__fbg-data-access__get_directus_contacts': 'Hämtar kontaktpersoner från CRM...',
+        };
+
         // Stream messages from Claude
         let messageCount = 0;
         let allMessages: any[] = [];
@@ -70,8 +79,25 @@ export async function POST(req: NextRequest) {
           messageCount++;
           allMessages.push(message);
 
-          // Send periodic status updates
-          if (messageCount % 3 === 0) {
+          // Detect tool usage and send specific status updates
+          if (message.type === 'assistant' && message.message) {
+            const content = Array.isArray(message.message) ? message.message :
+                           (message.message.content ? message.message.content : []);
+
+            for (const block of content) {
+              if (block.type === 'tool_use' && block.name) {
+                const toolMessage = toolMessages[block.name] || 'Claude arbetar...';
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                  type: 'tool',
+                  message: toolMessage,
+                  tool: block.name
+                })}\n\n`));
+              }
+            }
+          }
+
+          // Send periodic status updates as fallback
+          if (messageCount % 5 === 0) {
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({
               type: 'thinking',
               message: 'Claude analyserar data och skapar presentation...'
@@ -88,7 +114,7 @@ export async function POST(req: NextRequest) {
             let claudeResponse = '';
 
             // Extract result text directly from result object
-            if (message.result && typeof message.result === 'string') {
+            if (message.subtype === 'success' && 'result' in message && typeof message.result === 'string') {
               claudeResponse = message.result;
               console.log('Got result string directly:', claudeResponse.substring(0, 500));
             }
