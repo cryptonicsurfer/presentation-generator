@@ -13,6 +13,10 @@ type StatusUpdate = {
   html?: string;
   title?: string;
   slideCount?: number;
+  presentationData?: {
+    title: string;
+    sections: string[];
+  };
 };
 
 export default function PresentationGenerator() {
@@ -21,12 +25,21 @@ export default function PresentationGenerator() {
   const [statusUpdates, setStatusUpdates] = useState<StatusUpdate[]>([]);
   const [generatedHTML, setGeneratedHTML] = useState<string | null>(null);
   const [presentationTitle, setPresentationTitle] = useState<string>('');
+  const [presentationData, setPresentationData] = useState<{ title: string; sections: string[] } | null>(null);
+  const [tweakPrompt, setTweakPrompt] = useState('');
+  const [isTweaking, setIsTweaking] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const examplePrompts = [
     'Skapa en företagsrapport för Randek AB',
     'KPI-översikt för Falkenberg Q4 2024',
-    'Gör en presentation som hämtar finansiell data från vår databas och kontakter och möten från crm-systemet om företaget:',
+    'Gör en presentation med finansiell data från vår databas och kontakter och möten från crm-systemet om företaget:',
+  ];
+
+  const exampleTweakPrompts = [
+    'Byt ut till bokslut 2024 istället för 2023',
+    'Lägg till en slide med finansiell jämförelse mot föregående år',
+    'Gör texten större och mer lättläst',
   ];
 
   const handleGenerate = async () => {
@@ -36,6 +49,7 @@ export default function PresentationGenerator() {
     setStatusUpdates([]);
     setGeneratedHTML(null);
     setPresentationTitle('');
+    setPresentationData(null);
 
     try {
       const response = await fetch('/api/generate', {
@@ -71,6 +85,9 @@ export default function PresentationGenerator() {
               if (data.type === 'complete' && data.html) {
                 setGeneratedHTML(data.html);
                 setPresentationTitle(data.title || 'Presentation');
+                if (data.presentationData) {
+                  setPresentationData(data.presentationData);
+                }
               }
             } catch (e) {
               console.error('Error parsing SSE data:', e);
@@ -130,18 +147,80 @@ export default function PresentationGenerator() {
     }
   };
 
+  const handleTweak = async () => {
+    if (!tweakPrompt.trim() || !presentationData) return;
+
+    setIsTweaking(true);
+    setStatusUpdates([]);
+
+    try {
+      const response = await fetch('/api/tweak', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tweakPrompt,
+          presentationData,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to tweak presentation');
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('No reader available');
+
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6)) as StatusUpdate;
+              setStatusUpdates((prev) => [...prev, data]);
+
+              if (data.type === 'complete' && data.html) {
+                setGeneratedHTML(data.html);
+                setPresentationTitle(data.title || presentationTitle);
+                if (data.presentationData) {
+                  setPresentationData(data.presentationData);
+                }
+              }
+            } catch (e) {
+              console.error('Error parsing SSE data:', e);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      setStatusUpdates((prev) => [
+        ...prev,
+        { type: 'error', message: 'Ett fel inträffade vid justering av presentation' },
+      ]);
+    } finally {
+      setIsTweaking(false);
+      setTweakPrompt('');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 p-8">
       <div className="max-w-[1800px] mx-auto">
         {/* Header */}
-        <div className="text-center mb-12">
-          <div className="flex items-center justify-center gap-3 mb-4">
+        <div className="text-center mb-6">
+          <div className="flex items-center justify-center gap-3 mb-2">
             <Sparkles className="w-10 h-10 text-blue-600" />
             <h1 className="text-5xl font-bold text-gray-900">Presentation Generator</h1>
           </div>
-          <p className="text-xl text-gray-600">
-            Skapa datadrivna presentationer med AI och företagsdata
-          </p>
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-5 gap-8">
@@ -167,17 +246,18 @@ export default function PresentationGenerator() {
                 <div className="space-y-2">
                   <p className="text-sm text-gray-600">Exempel på prompts:</p>
                   <div className="flex flex-wrap gap-2">
-                    {examplePrompts.map((example, i) => (
-                      <Button
-                        key={i}
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setPrompt(example)}
-                        disabled={isGenerating}
-                      >
-                        {example}
-                      </Button>
-                    ))}
+                  {examplePrompts.map((example, i) => (
+                    <Button
+                    key={i}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPrompt(example)}
+                    disabled={isGenerating}
+                    className="line-clamp-2"
+                    >
+                    {example}
+                    </Button>
+                  ))}
                   </div>
                 </div>
 
@@ -283,6 +363,65 @@ export default function PresentationGenerator() {
                     </div>
                   </div>
                 )}
+
+                {/* Tweak Presentation - Always visible, disabled until presentation is ready */}
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <h3 className={`text-lg font-semibold mb-2 ${!generatedHTML ? 'text-gray-400' : 'text-gray-900'}`}>
+                    Justera Presentation (efter generering är gjord)
+                  </h3>
+                  {/* <p className={`text-sm mb-4 ${!generatedHTML ? 'text-gray-400' : 'text-gray-600'}`}>
+                    Beskriv ändringar du vill göra (använder diff editing för snabbare resultat)
+                  </p> */}
+
+                  <div className="space-y-2">
+                    <Textarea
+                      placeholder={generatedHTML ? "Exempel: Lägg till en slide med finansiell jämförelse mot föregående år..." : "Väntar på presentation..."}
+                      value={tweakPrompt}
+                      onChange={(e) => setTweakPrompt(e.target.value)}
+                      rows={3}
+                      className="resize-none"
+                      disabled={!generatedHTML || isTweaking}
+                    />
+
+                    <div className="space-y-2">
+                      {/* <p className={`text-sm ${!generatedHTML ? 'text-gray-400' : 'text-gray-600'}`}>
+                        Exempel på justeringar:
+                      </p> */}
+                      <div className="flex flex-wrap gap-2">
+                        {exampleTweakPrompts.map((example, i) => (
+                          <Button
+                            key={i}
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setTweakPrompt(example)}
+                            disabled={!generatedHTML || isTweaking}
+                          >
+                            {example}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <Button
+                      onClick={handleTweak}
+                      disabled={!generatedHTML || isTweaking || !tweakPrompt.trim()}
+                      className="w-full"
+                      size="lg"
+                    >
+                      {isTweaking ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Justerar...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4" />
+                          Justera Presentation
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>

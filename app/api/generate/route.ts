@@ -37,8 +37,8 @@ export async function POST(req: NextRequest) {
         // Track sections
         let sections: string[] = [];
         
-        // claude-sonnet-4-5-20250929
-        // claude-haiku-4-5-20251001
+        // claude-sonnet-4-5-20250929 (more reliable with MCP tools)
+        // claude-haiku-4-5-20251001 (faster but less reliable with tools)
         // Run the query with Claude
         const queryInstance = query({
           prompt: userPrompt,
@@ -222,12 +222,16 @@ export async function POST(req: NextRequest) {
             // Generate final HTML
             const presentationHTML = generatePresentationHTML(presentationData.title || userPrompt, sections);
 
-            // Send completion with HTML
+            // Send completion with HTML and presentation data
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({
               type: 'complete',
               html: presentationHTML,
               title: presentationData.title || userPrompt,
-              slideCount: sections.length
+              slideCount: sections.length,
+              presentationData: {
+                title: presentationData.title || userPrompt,
+                sections: presentationData.sections || []
+              }
             })}\n\n`));
           }
         }
