@@ -117,7 +117,7 @@ export default function PresentationGenerator() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 p-8">
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-[1800px] mx-auto">
         {/* Header */}
         <div className="text-center mb-12">
           <div className="flex items-center justify-center gap-3 mb-4">
@@ -129,9 +129,9 @@ export default function PresentationGenerator() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 xl:grid-cols-5 gap-8">
           {/* Left Column: Input */}
-          <div className="space-y-6">
+          <div className="xl:col-span-2 space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle>Vad vill du skapa?</CardTitle>
@@ -223,7 +223,7 @@ export default function PresentationGenerator() {
           </div>
 
           {/* Right Column: Preview */}
-          <div>
+          <div className="xl:col-span-3">
             <Card className="h-full">
               <CardHeader>
                 <CardTitle>Förhandsvisning</CardTitle>
@@ -247,16 +247,17 @@ export default function PresentationGenerator() {
                       </Button>
                     </div>
 
-                    <div className="border-2 border-gray-200 rounded-lg overflow-hidden bg-white">
+                    <div className="w-full aspect-[16/9] border-2 border-gray-200 rounded-lg overflow-hidden bg-white shadow-2xl">
                       <iframe
                         ref={iframeRef}
-                        className="w-full h-[600px]"
+                        className="w-full h-full"
                         title="Presentation Preview"
+                        style={{ transform: 'scale(1)', transformOrigin: 'top left' }}
                       />
                     </div>
                   </>
                 ) : (
-                  <div className="flex items-center justify-center h-[600px] border-2 border-dashed border-gray-300 rounded-lg">
+                  <div className="flex items-center justify-center w-full aspect-[16/9] border-2 border-dashed border-gray-300 rounded-lg">
                     <div className="text-center text-gray-500">
                       <Sparkles className="w-16 h-16 mx-auto mb-4 opacity-50" />
                       <p className="text-lg">Väntar på generering...</p>
