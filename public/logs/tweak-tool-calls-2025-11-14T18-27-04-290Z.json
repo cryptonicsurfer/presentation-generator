@@ -1,0 +1,88 @@
+{
+  "generatedAt": "2025-11-14T18:27:04.290Z",
+  "type": "tweak",
+  "tweakPrompt": "hämta data om arbetsannonser som Randek har haft från vår db, summera sen per år och per yrkeskategori/grupp",
+  "originalTitle": "Företagsrapport - Randek AB",
+  "model": "claude-sonnet-4-5-20250929",
+  "toolCalls": [
+    {
+      "timestamp": "2025-11-14T18:26:24.275Z",
+      "type": "tool_use",
+      "toolName": "mcp__fbg-data-access__search_directus_companies",
+      "input": {
+        "searchTerm": "556399-7146"
+      }
+    },
+    {
+      "timestamp": "2025-11-14T18:26:24.285Z",
+      "type": "tool_use",
+      "toolName": "mcp__fbg-data-access__query_fbg_analytics",
+      "input": {
+        "query": "SELECT * FROM job_postings WHERE organization_number = '556399-7146' ORDER BY published_date DESC"
+      }
+    },
+    {
+      "timestamp": "2025-11-14T18:26:24.454Z",
+      "type": "tool_result",
+      "toolName": "toolu_01PBnzWHgMauXTdKPg7svaWR",
+      "output": "{\n  \"count\": 1,\n  \"companies\": [\n    {\n      \"id\": 149,\n      \"name\": \"Randek AB\",\n      \"organization_number\": \"556399-7146\",\n      \"industry\": \"Tillverkning och utvinning\",\n      \"description\": \"\",\n      \"employees\": 66,\n      \"street_address\": \"\",\n      \"city\": \"\"\n    }\n  ]\n}"
+    },
+    {
+      "timestamp": "2025-11-14T18:26:24.663Z",
+      "type": "tool_result",
+      "toolName": "toolu_01Swe1a97UJmXmDDcF6GDEpB",
+      "error": "{\n  \"error\": \"column \\\"organization_number\\\" does not exist\",\n  \"hint\": \"Check your SQL syntax and table/column names. Use LIMIT to avoid large results.\"\n}"
+    },
+    {
+      "timestamp": "2025-11-14T18:26:29.648Z",
+      "type": "tool_use",
+      "toolName": "mcp__fbg-data-access__query_fbg_analytics",
+      "input": {
+        "query": "SELECT * FROM job_postings LIMIT 1"
+      }
+    },
+    {
+      "timestamp": "2025-11-14T18:26:29.879Z",
+      "type": "tool_result",
+      "toolName": "toolu_017ufVawr7H8TsgJGs3mwHNp",
+      "output": "{\n  \"rowCount\": 1,\n  \"rows\": [\n    {\n      \"id\": 1,\n      \"original_af_id\": \"29649819\",\n      \"headline\": \"Bussförarutbildning för kvinnor i Halland Hösten 2025\",\n      \"employer_name\": \"Nobina Sverige AB\",\n      \"occupation_label\": \"Bussförare\",\n      \"publication_date\": \"2025-04-22T22:00:00.000Z\",\n      \"education_level\": \"No formal education requirement\",\n      \"employer_type\": \"Private\",\n      \"confidence\": 0.98,\n      \"created_at\": \"2025-06-17T15:41:17.003Z\"\n    }\n  ],\n  \"fields\": [\n    {\n      \"name\": \"id\",\n      \"dataType\": 23\n    },\n    {\n      \"name\": \"original_af_id\",\n      \"dataType\": 1043\n    },\n    {\n      \"name\": \"headline\",\n      \"dataType\": 25\n    },\n    {\n      \"name\": \"employer_name\",\n      \"dataType\": 1043\n    },\n    {\n      \"name\": \"occupation_label\",\n      \"dataType\": 1043\n    },\n    {\n      \"name\": \"publication_date\",\n      \"dataType\": 1082\n    },\n    {\n      \"name\": \"education_level\",\n      \"dataType\": 1043\n    },\n    {\n      \"name\": \"employer_type\",\n      \"dataType\": 1043\n    },\n    {\n      \"name\": \"confidence\",\n      \"dataType\": 701\n    },\n    {\n      \"name\": \"created_at\",\n      \"dataType\": 1114\n    }\n  ]\n}"
+    },
+    {
+      "timestamp": "2025-11-14T18:26:36.457Z",
+      "type": "tool_use",
+      "toolName": "mcp__fbg-data-access__query_fbg_analytics",
+      "input": {
+        "query": "SELECT \n  EXTRACT(YEAR FROM publication_date) as year,\n  occupation_label,\n  COUNT(*) as antal_annonser\nFROM job_postings \nWHERE employer_name ILIKE '%Randek%'\nGROUP BY EXTRACT(YEAR FROM publication_date), occupation_label\nORDER BY year DESC, antal_annonser DESC"
+      }
+    },
+    {
+      "timestamp": "2025-11-14T18:26:36.470Z",
+      "type": "tool_use",
+      "toolName": "mcp__fbg-data-access__query_fbg_analytics",
+      "input": {
+        "query": "SELECT \n  EXTRACT(YEAR FROM publication_date) as year,\n  COUNT(*) as totalt_antal_annonser\nFROM job_postings \nWHERE employer_name ILIKE '%Randek%'\nGROUP BY EXTRACT(YEAR FROM publication_date)\nORDER BY year DESC"
+      }
+    },
+    {
+      "timestamp": "2025-11-14T18:26:36.555Z",
+      "type": "tool_result",
+      "toolName": "toolu_01Fqk1ScUBpTSjMMmhu81yg9",
+      "output": "{\n  \"rowCount\": 38,\n  \"rows\": [\n    {\n      \"year\": \"2025\",\n      \"occupation_label\": \"Automationsingenjör, maskin\",\n      \"antal_annonser\": \"1\"\n    },\n    {\n      \"year\": \"2025\",\n      \"occupation_label\": \"Offertingenjör\",\n      \"antal_annonser\": \"1\"\n    },\n    {\n      \"year\": \"2024\",\n      \"occupation_label\": \"Maskinkonstruktör\",\n      \"antal_annonser\": \"4\"\n    },\n    {\n      \"year\": \"2024\",\n      \"occupation_label\": \"Automationsingenjör, maskin\",\n      \"antal_annonser\": \"3\"\n    },\n    {\n      \"year\": \"2024\",\n      \"occupation_label\": \"Civilingenjör, maskin\",\n      \"antal_annonser\": \"2\"\n    },\n    {\n      \"year\": \"2024\",\n      \"occupation_label\": \"Installationselektriker\",\n      \"antal_annonser\": \"1\"\n    },\n    {\n      \"year\": \"2024\",\n      \"occupation_label\": \"Kundserviceingenjör, tillverkningsindustri\",\n      \"antal_annonser\": \"1\"\n    },\n    {\n      \"year\": \"2024\",\n      \"occupation_label\": \"Maskinmontör\",\n      \"antal_annonser\": \"1\"\n    },\n    {\n      \"year\": \"2024\",\n      \"occupation_label\": \"Offertberedare\",\n      \"antal_annonser\": \"1\"\n    },\n    {\n      \"year\": \"2024\",\n      \"occupation_label\": \"Systemutvecklare/Programmerare\",\n      \"antal_annonser\": \"1\"\n    },\n    {\n      \"year\": \"2024\",\n      \"occupation_label\": \"Inköpare\",\n      \"antal_annonser\": \"1\"\n    },\n    {\n      \"year\": \"2023\",\n      \"occupation_label\": \"Automationsingenjör, maskin\",\n      \"antal_annonser\": \"7\"\n    },\n    {\n      \"year\": \"2023\",\n      \"occupation_label\": \"Konstruktör, tillverkningsindustri\",\n      \"antal_annonser\": \"3\"\n    },\n    {\n      \"year\": \"2023\",\n      \"occupation_label\": \"Liftbyggare/Liftmontör/Montageledare, liftar\",\n      \"antal_annonser\": \"3\"\n    },\n    {\n      \"year\": \"2023\",\n      \"occupation_label\": \"Servicetekniker, maskin\",\n      \"antal_annonser\": \"2\"\n    },\n    {\n      \"year\": \"2023\",\n      \"occupation_label\": \"Teamledare\",\n      \"antal_annonser\": \"1\"\n    },\n    {\n      \"year\": \"2023\",\n      \"occupation_label\": \"Applikationsingenjör\",\n      \"antal_annonser\": \"1\"\n    },\n    {\n      \"year\": \"2023\",\n      \"occupation_label\": \"Automationstekniker, tillverkningsindustri\",\n      \"antal_annonser\": \"1\"\n    },\n    {\n      \"year\": \"2023\",\n      \"occupation_label\": \"Civilingenjör, konstruktion, maskin\",\n      \"antal_annonser\": \"1\"\n    },\n    {\n      \"year\": \"2023\",\n      \"occupation_label\": \"Serviceingenjör, maskin\",\n      \"antal_annonser\": \"1\"\n    },\n    {\n      \"year\": \"2022\",\n      \"occupation_label\": \"Civilingenjör, konstruktion, maskin\",\n      \"antal_annonser\": \"5\"\n    },\n    {\n      \"year\": \"2022\",\n      \"occupation_label\": \"Maskinmontör\",\n      \"antal_annonser\": \"2\"\n    },\n    {\n      \"year\": \"2022\",\n      \"occupation_label\": \"Internationell säljare\",\n      \"antal_annonser\": \"1\"\n    },\n    {\n      \"year\": \"2022\",\n      \"occupation_label\": \"Maskinkonstruktör\",\n      \"antal_annonser\": \"1\"\n    },\n    {\n      \"year\": \"2022\",\n      \"occupation_label\": \"Projektledare, bygg och anläggning\",\n      \"antal_annonser\": \"1\"\n    },\n    {\n      \"year\": \"2022\",\n      \"occupation_label\": \"Automationsingenjör, maskin\",\n      \"antal_annonser\": \"1\"\n    },\n    {\n      \"year\": \"2022\",\n      \"occupation_label\": \"Resehandläggare\",\n      \"antal_annonser\": \"1\"\n    },\n    {\n      \"year\": \"2022\",\n      \"occupation_label\": \"Innesäljare\",\n      \"antal_annonser\": \"1\"\n    },\n    {\n      \"year\": \"2021\",\n      \"occupation_label\": \"Automationsingenjör, maskin\",\n      \"antal_annonser\": \"2\"\n    },\n    {\n      \"year\": \"2021\",\n      \"occupation_label\": \"Arbetsledare, anläggning\",\n      \"antal_annonser\": \"1\"\n    },\n    {\n      \"year\": \"2021\",\n      \"occupation_label\": \"Civilingenjör, konstruktion, maskin\",\n      \"antal_annonser\": \"1\"\n    },\n    {\n      \"year\": \"2021\",\n      \"occupation_label\": \"Controller\",\n      \"antal_annonser\": \"1\"\n    },\n    {\n      \"year\": \"2021\",\n      \"occupation_label\": \"Projektledare, bygg och anläggning\",\n      \"antal_annonser\": \"1\"\n    },\n    {\n      \"year\": \"2021\",\n      \"occupation_label\": \"Servicetekniker, maskin\",\n      \"antal_annonser\": \"1\"\n    },\n    {\n      \"year\": \"2021\",\n      \"occupation_label\": \"Utesäljare\",\n      \"antal_annonser\": \"1\"\n    },\n    {\n      \"year\": \"2020\",\n      \"occupation_label\": \"Systemutvecklare/Programmerare\",\n      \"antal_annonser\": \"2\"\n    },\n    {\n      \"year\": \"2020\",\n      \"occupation_label\": \"Innesäljare\",\n      \"antal_annonser\": \"1\"\n    },\n    {\n      \"year\": \"2020\",\n      \"occupation_label\": \"Projekteringsingenjör, maskin\",\n      \"antal_annonser\": \"1\"\n    }\n  ],\n  \"fields\": [\n    {\n      \"name\": \"year\",\n      \"dataType\": 1700\n    },\n    {\n      \"name\": \"occupation_label\",\n      \"dataType\": 1043\n    },\n    {\n      \"name\": \"antal_annonser\",\n      \"dataType\": 20\n    }\n  ]\n}"
+    },
+    {
+      "timestamp": "2025-11-14T18:26:36.621Z",
+      "type": "tool_result",
+      "toolName": "toolu_018sSAGYYfRL8CT8etgJFnev",
+      "output": "{\n  \"rowCount\": 6,\n  \"rows\": [\n    {\n      \"year\": \"2025\",\n      \"totalt_antal_annonser\": \"2\"\n    },\n    {\n      \"year\": \"2024\",\n      \"totalt_antal_annonser\": \"15\"\n    },\n    {\n      \"year\": \"2023\",\n      \"totalt_antal_annonser\": \"20\"\n    },\n    {\n      \"year\": \"2022\",\n      \"totalt_antal_annonser\": \"13\"\n    },\n    {\n      \"year\": \"2021\",\n      \"totalt_antal_annonser\": \"8\"\n    },\n    {\n      \"year\": \"2020\",\n      \"totalt_antal_annonser\": \"4\"\n    }\n  ],\n  \"fields\": [\n    {\n      \"name\": \"year\",\n      \"dataType\": 1700\n    },\n    {\n      \"name\": \"totalt_antal_annonser\",\n      \"dataType\": 20\n    }\n  ]\n}"
+    }
+  ],
+  "summary": {
+    "totalToolCalls": 5,
+    "successfulResults": 4,
+    "errors": 1,
+    "toolsUsed": [
+      "mcp__fbg-data-access__search_directus_companies",
+      "mcp__fbg-data-access__query_fbg_analytics"
+    ]
+  }
+}

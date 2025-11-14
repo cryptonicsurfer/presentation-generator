@@ -1,0 +1,77 @@
+{
+  "generatedAt": "2025-11-14T18:23:50.754Z",
+  "prompt": "Skapa en företagsrapport för Randek AB",
+  "model": "claude-haiku-4-5-20251001",
+  "toolCalls": [
+    {
+      "timestamp": "2025-11-14T18:23:18.679Z",
+      "type": "tool_use",
+      "toolName": "mcp__fbg-data-access__search_directus_companies",
+      "input": {
+        "searchTerm": "Randek",
+        "fields": "id,name,organization_number,industry,description,employees"
+      }
+    },
+    {
+      "timestamp": "2025-11-14T18:23:18.692Z",
+      "type": "tool_use",
+      "toolName": "mcp__fbg-data-access__query_fbg_analytics",
+      "input": {
+        "query": "SELECT * FROM company_financials WHERE foretag ILIKE '%Randek%' ORDER BY bokslutsaar DESC LIMIT 5"
+      }
+    },
+    {
+      "timestamp": "2025-11-14T18:23:18.856Z",
+      "type": "tool_result",
+      "toolName": "toolu_01UhsVgPXpwbwi2eBA13zPiS",
+      "output": "{\n  \"count\": 1,\n  \"companies\": [\n    {\n      \"id\": 149,\n      \"name\": \"Randek AB\",\n      \"organization_number\": \"556399-7146\",\n      \"industry\": \"Tillverkning och utvinning\",\n      \"description\": \"\",\n      \"employees\": 66\n    }\n  ]\n}"
+    },
+    {
+      "timestamp": "2025-11-14T18:23:19.110Z",
+      "type": "tool_result",
+      "toolName": "toolu_01T9uNcnUWYpKnos6Pvwz2tp",
+      "output": "{\n  \"rowCount\": 5,\n  \"rows\": [\n    {\n      \"id\": 71836,\n      \"bokslutsaar\": 2024,\n      \"omsattning\": \"479385\",\n      \"anstallda\": 72,\n      \"arbetstallen\": 1,\n      \"lonsamhetsindex\": \"25.56657752417831\",\n      \"bransch_grov\": \"Tillverkning och utvinning\",\n      \"bransch_fin\": \"Verkstad\",\n      \"foretag\": \"Randek AB\",\n      \"org_nummer\": \"5563997146\",\n      \"totalt_kapital\": \"412439\",\n      \"eget_kapital\": \"85029\",\n      \"soliditet\": \"0.2837984768656698\",\n      \"resultat\": \"38601\",\n      \"rorelsemarginal\": \"0.08067000344823982\",\n      \"created_at\": \"2025-10-07T08:04:25.453Z\",\n      \"updated_at\": \"2025-10-07T08:04:25.453Z\"\n    },\n    {\n      \"id\": 73575,\n      \"bokslutsaar\": 2024,\n      \"omsattning\": \"519\",\n      \"anstallda\": 0,\n      \"arbetstallen\": 1,\n      \"lonsamhetsindex\": \"-9999\",\n      \"bransch_grov\": \"Finans och fastighetsverksamhet\",\n      \"bransch_fin\": \"Fastigheter\",\n      \"foretag\": \"Randek Fastighet AB\",\n      \"org_nummer\": \"5565707790\",\n      \"totalt_kapital\": \"3620\",\n      \"eget_kapital\": \"1243\",\n      \"soliditet\": \"0.3433701657458563\",\n      \"resultat\": \"-191\",\n      \"rorelsemarginal\": \"-0.4847715736040609\",\n      \"created_at\": \"2025-10-07T08:04:25.453Z\",\n      \"updated_at\": \"2025-10-07T08:04:25.453Z\"\n    },\n    {\n      \"id\": 69602,\n      \"bokslutsaar\": 2023,\n      \"omsattning\": \"1640\",\n      \"anstallda\": 0,\n      \"arbetstallen\": 1,\n      \"lonsamhetsindex\": \"68.31548489666137\",\n      \"bransch_grov\": \"Finans och fastighetsverksamhet\",\n      \"bransch_fin\": \"Fastigheter\",\n      \"foretag\": \"Randek Fastighet AB\",\n      \"org_nummer\": \"5565707790\",\n      \"totalt_kapital\": \"3907\",\n      \"eget_kapital\": \"1121\",\n      \"soliditet\": \"0.2869209111850525\",\n      \"resultat\": \"599\",\n      \"rorelsemarginal\": \"0.3652439024390244\",\n      \"created_at\": \"2025-10-07T08:04:25.453Z\",\n      \"updated_at\": \"2025-10-07T08:04:25.453Z\"\n    },\n    {\n      \"id\": 68408,\n      \"bokslutsaar\": 2023,\n      \"omsattning\": \"249351\",\n      \"anstallda\": 66,\n      \"arbetstallen\": 1,\n      \"lonsamhetsindex\": \"11.60938247063048\",\n      \"bransch_grov\": \"Tillverkning och utvinning\",\n      \"bransch_fin\": \"Verkstad\",\n      \"foretag\": \"Randek AB\",\n      \"org_nummer\": \"5563997146\",\n      \"totalt_kapital\": \"333778\",\n      \"eget_kapital\": \"57842\",\n      \"soliditet\": \"0.2522323820024088\",\n      \"resultat\": \"20654\",\n      \"rorelsemarginal\": \"0.08314848288439164\",\n      \"created_at\": \"2025-10-07T08:04:25.453Z\",\n      \"updated_at\": \"2025-10-07T08:04:25.453Z\"\n    },\n    {\n      \"id\": 66237,\n      \"bokslutsaar\": 2022,\n      \"omsattning\": \"1738\",\n      \"anstallda\": 0,\n      \"arbetstallen\": 1,\n      \"lonsamhetsindex\": \"86.05555654496884\",\n      \"bransch_grov\": \"Finans och fastighetsverksamhet\",\n      \"bransch_fin\": \"Fastigheter\",\n      \"foretag\": \"Randek Fastighet AB\",\n      \"org_nummer\": \"5565707790\",\n      \"totalt_kapital\": \"4358\",\n      \"eget_kapital\": \"999\",\n      \"soliditet\": \"0.229233593391464\",\n      \"resultat\": \"1123\",\n      \"rorelsemarginal\": \"0.6461449942462602\",\n      \"created_at\": \"2025-10-07T08:04:25.453Z\",\n      \"updated_at\": \"2025-10-07T08:04:25.453Z\"\n    }\n  ],\n  \"fields\": [\n    {\n      \"name\": \"id\",\n      \"dataType\": 23\n    },\n    {\n      \"name\": \"bokslutsaar\",\n      \"dataType\": 23\n    },\n    {\n      \"name\": \"omsattning\",\n      \"dataType\": 1700\n    },\n    {\n      \"name\": \"anstallda\",\n      \"dataType\": 23\n    },\n    {\n      \"name\": \"arbetstallen\",\n      \"dataType\": 23\n    },\n    {\n      \"name\": \"lonsamhetsindex\",\n      \"dataType\": 1700\n    },\n    {\n      \"name\": \"bransch_grov\",\n      \"dataType\": 1043\n    },\n    {\n      \"name\": \"bransch_fin\",\n      \"dataType\": 1043\n    },\n    {\n      \"name\": \"foretag\",\n      \"dataType\": 1043\n    },\n    {\n      \"name\": \"org_nummer\",\n      \"dataType\": 1043\n    },\n    {\n      \"name\": \"totalt_kapital\",\n      \"dataType\": 1700\n    },\n    {\n      \"name\": \"eget_kapital\",\n      \"dataType\": 1700\n    },\n    {\n      \"name\": \"soliditet\",\n      \"dataType\": 1700\n    },\n    {\n      \"name\": \"resultat\",\n      \"dataType\": 1700\n    },\n    {\n      \"name\": \"rorelsemarginal\",\n      \"dataType\": 1700\n    },\n    {\n      \"name\": \"created_at\",\n      \"dataType\": 1114\n    },\n    {\n      \"name\": \"updated_at\",\n      \"dataType\": 1114\n    }\n  ]\n}"
+    },
+    {
+      "timestamp": "2025-11-14T18:23:22.073Z",
+      "type": "tool_use",
+      "toolName": "mcp__fbg-data-access__count_directus_meetings",
+      "input": {
+        "companyId": 149,
+        "year": 2025
+      }
+    },
+    {
+      "timestamp": "2025-11-14T18:23:22.085Z",
+      "type": "tool_use",
+      "toolName": "mcp__fbg-data-access__get_directus_contacts",
+      "input": {
+        "companyId": 149,
+        "fields": "id,name,email,phone,title"
+      }
+    },
+    {
+      "timestamp": "2025-11-14T18:23:22.198Z",
+      "type": "tool_result",
+      "toolName": "toolu_016XaQ7jjJCkDwANoS5d7Eub",
+      "output": "{\n  \"count\": 1,\n  \"year\": 2025,\n  \"companyId\": 149\n}"
+    },
+    {
+      "timestamp": "2025-11-14T18:23:22.271Z",
+      "type": "tool_result",
+      "toolName": "toolu_01Rj4skNUgY4UQv3fj5og3dq",
+      "output": "{\n  \"count\": 2,\n  \"contacts\": [\n    {\n      \"id\": 108,\n      \"name\": \"Darcie Smith\",\n      \"email\": null,\n      \"phone\": null,\n      \"title\": \"Project Manager\"\n    },\n    {\n      \"id\": 111,\n      \"name\": \"Ola Lindh\",\n      \"email\": null,\n      \"phone\": \"+46 (0)346-557 00\",\n      \"title\": \"VD (Verkställande direktör)\"\n    }\n  ]\n}"
+    }
+  ],
+  "summary": {
+    "totalToolCalls": 4,
+    "successfulResults": 4,
+    "errors": 0,
+    "toolsUsed": [
+      "mcp__fbg-data-access__search_directus_companies",
+      "mcp__fbg-data-access__query_fbg_analytics",
+      "mcp__fbg-data-access__count_directus_meetings",
+      "mcp__fbg-data-access__get_directus_contacts"
+    ]
+  }
+}

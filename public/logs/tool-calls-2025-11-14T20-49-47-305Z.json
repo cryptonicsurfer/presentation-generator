@@ -1,0 +1,12 @@
+{
+  "generatedAt": "2025-11-14T20:49:47.305Z",
+  "prompt": "Skapa en företagsrapport för Randek AB",
+  "model": "claude-haiku-4-5-20251001",
+  "toolCalls": [],
+  "summary": {
+    "totalToolCalls": 0,
+    "successfulResults": 0,
+    "errors": 0,
+    "toolsUsed": []
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "generatedAt": "2025-11-14T18:48:45.619Z",
+  "type": "tweak",
+  "tweakPrompt": "Lägg till en slide med finansiell jämförelse mot föregående år",
+  "originalTitle": "Företagsrapport - Randek AB",
+  "model": "claude-sonnet-4-5-20250929",
+  "toolCalls": [
+    {
+      "timestamp": "2025-11-14T18:47:59.106Z",
+      "type": "tool_use",
+      "toolName": "mcp__fbg-data-access__query_fbg_analytics",
+      "input": {
+        "query": "\nSELECT \n  year,\n  revenue,\n  profit,\n  employees,\n  equity_ratio,\n  profit_margin\nFROM company_financials\nWHERE organization_number = '556399-7146'\n  AND year IN (2023, 2024)\nORDER BY year\n"
+      }
+    },
+    {
+      "timestamp": "2025-11-14T18:47:59.319Z",
+      "type": "tool_result",
+      "toolName": "toolu_01SnzPbtvkhomw5mAaEyUGns",
+      "error": "{\n  \"error\": \"column \\\"year\\\" does not exist\",\n  \"hint\": \"Check your SQL syntax and table/column names. Use LIMIT to avoid large results.\"\n}"
+    },
+    {
+      "timestamp": "2025-11-14T18:48:03.676Z",
+      "type": "tool_use",
+      "toolName": "mcp__fbg-data-access__query_fbg_analytics",
+      "input": {
+        "query": "\nSELECT *\nFROM company_financials\nWHERE organization_number = '556399-7146'\nLIMIT 5\n"
+      }
+    },
+    {
+      "timestamp": "2025-11-14T18:48:03.858Z",
+      "type": "tool_result",
+      "toolName": "toolu_016TG1RWjG2Uk5bFT5GqsebH",
+      "error": "{\n  \"error\": \"column \\\"organization_number\\\" does not exist\",\n  \"hint\": \"Check your SQL syntax and table/column names. Use LIMIT to avoid large results.\"\n}"
+    },
+    {
+      "timestamp": "2025-11-14T18:48:07.889Z",
+      "type": "tool_use",
+      "toolName": "mcp__fbg-data-access__query_fbg_analytics",
+      "input": {
+        "query": "\nSELECT column_name, data_type \nFROM information_schema.columns \nWHERE table_name = 'company_financials'\nORDER BY ordinal_position\n"
+      }
+    },
+    {
+      "timestamp": "2025-11-14T18:48:08.077Z",
+      "type": "tool_result",
+      "toolName": "toolu_01KXLEZKUSmA6eUgbFJSgYaV",
+      "output": "{\n  \"rowCount\": 17,\n  \"rows\": [\n    {\n      \"column_name\": \"id\",\n      \"data_type\": \"integer\"\n    },\n    {\n      \"column_name\": \"bokslutsaar\",\n      \"data_type\": \"integer\"\n    },\n    {\n      \"column_name\": \"omsattning\",\n      \"data_type\": \"numeric\"\n    },\n    {\n      \"column_name\": \"anstallda\",\n      \"data_type\": \"integer\"\n    },\n    {\n      \"column_name\": \"arbetstallen\",\n      \"data_type\": \"integer\"\n    },\n    {\n      \"column_name\": \"lonsamhetsindex\",\n      \"data_type\": \"numeric\"\n    },\n    {\n      \"column_name\": \"bransch_grov\",\n      \"data_type\": \"character varying\"\n    },\n    {\n      \"column_name\": \"bransch_fin\",\n      \"data_type\": \"character varying\"\n    },\n    {\n      \"column_name\": \"foretag\",\n      \"data_type\": \"character varying\"\n    },\n    {\n      \"column_name\": \"org_nummer\",\n      \"data_type\": \"character varying\"\n    },\n    {\n      \"column_name\": \"totalt_kapital\",\n      \"data_type\": \"numeric\"\n    },\n    {\n      \"column_name\": \"eget_kapital\",\n      \"data_type\": \"numeric\"\n    },\n    {\n      \"column_name\": \"soliditet\",\n      \"data_type\": \"numeric\"\n    },\n    {\n      \"column_name\": \"resultat\",\n      \"data_type\": \"numeric\"\n    },\n    {\n      \"column_name\": \"rorelsemarginal\",\n      \"data_type\": \"numeric\"\n    },\n    {\n      \"column_name\": \"created_at\",\n      \"data_type\": \"timestamp without time zone\"\n    },\n    {\n      \"column_name\": \"updated_at\",\n      \"data_type\": \"timestamp without time zone\"\n    }\n  ],\n  \"fields\": [\n    {\n      \"name\": \"column_name\",\n      \"dataType\": 19\n    },\n    {\n      \"name\": \"data_type\",\n      \"dataType\": 1043\n    }\n  ]\n}"
+    },
+    {
+      "timestamp": "2025-11-14T18:48:13.523Z",
+      "type": "tool_use",
+      "toolName": "mcp__fbg-data-access__query_fbg_analytics",
+      "input": {
+        "query": "\nSELECT \n  bokslutsaar,\n  omsattning,\n  resultat,\n  anstallda,\n  soliditet,\n  rorelsemarginal,\n  lonsamhetsindex,\n  eget_kapital\nFROM company_financials\nWHERE org_nummer = '556399-7146'\n  AND bokslutsaar IN (2023, 2024)\nORDER BY bokslutsaar\n"
+      }
+    },
+    {
+      "timestamp": "2025-11-14T18:48:13.577Z",
+      "type": "tool_result",
+      "toolName": "toolu_01JiDfcZ4PnjFgRBk8hKLgXG",
+      "output": "{\n  \"rowCount\": 0,\n  \"rows\": [],\n  \"fields\": [\n    {\n      \"name\": \"bokslutsaar\",\n      \"dataType\": 23\n    },\n    {\n      \"name\": \"omsattning\",\n      \"dataType\": 1700\n    },\n    {\n      \"name\": \"resultat\",\n      \"dataType\": 1700\n    },\n    {\n      \"name\": \"anstallda\",\n      \"dataType\": 23\n    },\n    {\n      \"name\": \"soliditet\",\n      \"dataType\": 1700\n    },\n    {\n      \"name\": \"rorelsemarginal\",\n      \"dataType\": 1700\n    },\n    {\n      \"name\": \"lonsamhetsindex\",\n      \"dataType\": 1700\n    },\n    {\n      \"name\": \"eget_kapital\",\n      \"dataType\": 1700\n    }\n  ]\n}"
+    },
+    {
+      "timestamp": "2025-11-14T18:48:19.784Z",
+      "type": "tool_use",
+      "toolName": "mcp__fbg-data-access__query_fbg_analytics",
+      "input": {
+        "query": "\nSELECT \n  bokslutsaar,\n  omsattning,\n  resultat,\n  anstallda,\n  soliditet,\n  rorelsemarginal,\n  lonsamhetsindex,\n  eget_kapital\nFROM company_financials\nWHERE org_nummer LIKE '%556399-7146%'\nORDER BY bokslutsaar DESC\nLIMIT 5\n"
+      }
+    },
+    {
+      "timestamp": "2025-11-14T18:48:19.880Z",
+      "type": "tool_result",
+      "toolName": "toolu_016uxzSUg5Zi4UchDiTHcTkx",
+      "output": "{\n  \"rowCount\": 0,\n  \"rows\": [],\n  \"fields\": [\n    {\n      \"name\": \"bokslutsaar\",\n      \"dataType\": 23\n    },\n    {\n      \"name\": \"omsattning\",\n      \"dataType\": 1700\n    },\n    {\n      \"name\": \"resultat\",\n      \"dataType\": 1700\n    },\n    {\n      \"name\": \"anstallda\",\n      \"dataType\": 23\n    },\n    {\n      \"name\": \"soliditet\",\n      \"dataType\": 1700\n    },\n    {\n      \"name\": \"rorelsemarginal\",\n      \"dataType\": 1700\n    },\n    {\n      \"name\": \"lonsamhetsindex\",\n      \"dataType\": 1700\n    },\n    {\n      \"name\": \"eget_kapital\",\n      \"dataType\": 1700\n    }\n  ]\n}"
+    }
+  ],
+  "summary": {
+    "totalToolCalls": 5,
+    "successfulResults": 3,
+    "errors": 2,
+    "toolsUsed": [
+      "mcp__fbg-data-access__query_fbg_analytics"
+    ]
+  }
+}

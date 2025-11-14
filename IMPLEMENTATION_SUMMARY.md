@@ -65,6 +65,11 @@ Copied all Falkenberg kommun logos to `public/assets/`:
 - Horizontal (LIGG) and stacked (STÅ) layouts
 - SVG and PNG formats
 
+### 6. **Tweak Endpoint Enhancements** (`app/api/tweak/route.ts`)
+- Sends the full HTML for every slide inside the system prompt so Claude can accurately target existing content.
+- Introduces an operations-based response contract (`replace`, `insert`, `remove`, `reorder`) that the server applies server-side, preventing unintended rewrites of untouched slides.
+- Allows MCP data refreshes when tweaks request new or corrected numbers while still favoring local edits for purely cosmetic changes.
+
 ## Architecture
 
 ```

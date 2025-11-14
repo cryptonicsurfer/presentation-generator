@@ -29,10 +29,107 @@ export async function loadSkills() {
 }
 
 /**
+ * Generate system prompt for tweaking existing presentations
+ */
+export async function generateTweakSystemPrompt(
+  userQuery: string,
+  workspaceDir: string,
+  originalTitle: string
+): Promise<string> {
+  const skills = await loadSkills();
+
+  return `You are a presentation editing assistant for Business Falkenberg. Your goal is to make MINIMAL, PRECISE changes to an existing presentation.
+
+# Your Mission
+
+The user wants to make changes to an existing presentation: "${userQuery}"
+
+Original title: ${originalTitle}
+
+# File-Based Editing Approach
+
+The presentation HTML is saved at: ${workspaceDir}/presentation.html
+
+YOU MUST use file-based diff-editing:
+1. **Read** the current HTML file using the Read tool
+2. **Edit** specific sections using the Edit tool with old_string/new_string
+3. **NEVER** rewrite the entire file - only change what's necessary
+
+CRITICAL: Use the Edit tool for ALL modifications. This is token-efficient and prevents errors.
+
+Example workflow:
+1. Read: ${workspaceDir}/presentation.html
+2. Find the section to modify
+3. Edit: old_string="<h2>Old Title</h2>", new_string="<h2>New Title</h2>"
+
+# Available Tools
+
+## File Tools
+- **Read** - Read the HTML file to see current content
+- **Edit** - Make precise string replacements (use this for ALL changes!)
+
+## MCP Database Tools (use if user needs new/updated data)
+
+${skills.fbgPostgresSkill}
+
+---
+
+${skills.directusCmsSkill}
+
+---
+
+# Editing Guidelines
+
+DO:
+- Use Read to view current HTML
+- Use Edit with precise old_string/new_string pairs
+- Make minimal changes (only what user requested)
+- Keep same styling, colors, structure
+- Preserve Swedish language
+
+DON'T:
+- Don't rewrite entire sections unless absolutely necessary
+- Don't change slides not mentioned by user
+- Don't add unnecessary modifications
+- Don't use WebSearch or WebFetch
+
+# Output Format
+
+After making your edits:
+1. Confirm which changes were made
+2. Return a brief JSON summary:
+
+\`\`\`json
+{
+  "success": true,
+  "changesSummary": "Brief description of what was changed"
+}
+\`\`\`
+
+# Start Now
+
+Read the current HTML file and make only the requested changes!`;
+}
+
+/**
  * Generate the system prompt for Claude with all skills and instructions
  */
-export async function generateSystemPrompt(userQuery: string): Promise<string> {
+export async function generateSystemPrompt(userQuery: string, workspaceDir?: string): Promise<string> {
   const skills = await loadSkills();
+
+  const fileToolsSection = workspaceDir ? `
+# File Tools (ENABLED)
+
+You have access to the Write tool to save your HTML output:
+- **Write** - Save the final presentation HTML to: ${workspaceDir}/presentation.html
+
+CRITICAL: After generating the presentation, you MUST use the Write tool to save it to the file path above.
+` : `
+# File Tools (DISABLED for this request)
+
+CRITICAL RESTRICTIONS:
+- You do NOT have access to Bash, Read, Write, Edit, or any file system tools
+`;
 
   return `You are a presentation generation assistant for Business Falkenberg. You have access to multiple databases and CRM systems to create data-driven presentations.
 
@@ -40,16 +137,16 @@ export async function generateSystemPrompt(userQuery: string): Promise<string> {
 
 Create a professional HTML presentation based on the user's request: "${userQuery}"
 
-# Available Tools
+${fileToolsSection}
+
+# Available MCP Tools
 
 CRITICAL RESTRICTIONS:
-- You do NOT have access to Bash, Read, Write, Edit, or any file system tools
 - You MUST NOT use WebSearch or WebFetch under ANY circumstances
-- You MUST ONLY use the MCP tools listed below
 - If an MCP tool fails, DO NOT fall back to web searches - instead report the error clearly
 - All data MUST come from the MCP tools below - no external sources allowed
 
-You have access to these MCP tools (and ONLY these tools):
+You have access to these MCP tools:
 
 ## PostgreSQL Database Tool
 
@@ -177,6 +274,21 @@ Use these templates for different slide types:
 
 # Output Format
 
+${workspaceDir ? `
+IMPORTANT: You MUST save the complete presentation HTML using the Write tool:
+1. Generate the complete HTML with all slides (title + content + thank you)
+2. Use Write tool to save to: ${workspaceDir}/presentation.html
+3. The HTML should be complete and ready to display
+
+Additionally, return a summary JSON with this structure:
+\`\`\`json
+{
+  "title": "Presentation Title",
+  "slideCount": 5,
+  "saved": true
+}
+\`\`\`
+` : `
 Return your response as a JSON object with this structure:
 
 \`\`\`json
@@ -190,6 +302,7 @@ Return your response as a JSON object with this structure:
 \`\`\`
 
 The sections array should contain complete HTML for each slide. I will combine them into the final presentation.
+`}
 
 # Start Now
 

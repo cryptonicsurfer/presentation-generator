@@ -3,9 +3,22 @@ import { query } from '@anthropic-ai/claude-agent-sdk';
 import { createDataAccessMcpServer } from '@/lib/mcp';
 import { generateSystemPrompt } from '@/lib/presentation/skills-loader';
 import { generatePresentationHTML, generateTitleSlide, generateThankYouSlide } from '@/lib/presentation/template';
+import { writeFileSync } from 'fs';
+import { join } from 'path';
+import { createWorkspace, readHtml, saveMetadata } from '@/lib/workspace';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300; // 5 minutes for complex presentations
+
+// Type for tool call logging
+type ToolCallLog = {
+  timestamp: string;
+  type: 'tool_use' | 'tool_result';
+  toolName: string;
+  input?: any;
+  output?: any;
+  error?: string;
+};
 
 export async function POST(req: NextRequest) {
   const encoder = new TextEncoder();
@@ -26,8 +39,14 @@ export async function POST(req: NextRequest) {
         // Send initial message
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'status', message: 'Initierar presentation generator...' })}\n\n`));
 
-        // Generate system prompt with skills
-        const systemPrompt = await generateSystemPrompt(userPrompt);
+        // Create workspace for this generation session
+        const workspace = await createWorkspace();
+        console.log(`Created workspace: ${workspace.workspaceDir}`);
+
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'status', message: 'Skapar arbetsyta...' })}\n\n`));
+
+        // Generate system prompt with skills AND workspace path
+        const systemPrompt = await generateSystemPrompt(userPrompt, workspace.workspaceDir);
 
         // Create MCP server with database tools
         const mcpServer = createDataAccessMcpServer();
@@ -36,7 +55,7 @@ export async function POST(req: NextRequest) {
 
         // Track sections
         let sections: string[] = [];
-        
+
         // claude-sonnet-4-5-20250929 (more reliable with MCP tools)
         // claude-haiku-4-5-20251001 (faster but less reliable with tools)
         // Run the query with Claude
@@ -44,13 +63,16 @@ export async function POST(req: NextRequest) {
           prompt: userPrompt,
           options: {
             systemPrompt,
+            // Set working directory to workspace
+            cwd: workspace.workspaceDir,
             mcpServers: {
               'fbg-data-access': mcpServer,
             },
             model: 'claude-haiku-4-5-20251001',
             maxTurns: 50,
-            // CRITICAL: Only allow our MCP tools, disable standard tools
+            // CRITICAL: Allow Write tool for file-based output + MCP tools
             allowedTools: [
+              'Write', // Enable Write tool to save HTML to workspace
               'mcp__fbg-data-access__query_fbg_analytics',
               'mcp__fbg-data-access__search_directus_companies',
               'mcp__fbg-data-access__count_directus_meetings',
@@ -65,6 +87,7 @@ export async function POST(req: NextRequest) {
 
         // Tool name to user-friendly message mapping
         const toolMessages: Record<string, string> = {
+          'Write': 'Sparar presentation till arbetsyta...',
           'mcp__fbg-data-access__search_directus_companies': 'Söker efter företag i CRM-systemet...',
           'mcp__fbg-data-access__query_fbg_analytics': 'Hämtar finansiell data från databas...',
           'mcp__fbg-data-access__count_directus_meetings': 'Räknar antal möten med företaget...',
@@ -74,6 +97,7 @@ export async function POST(req: NextRequest) {
         // Stream messages from Claude
         let messageCount = 0;
         let allMessages: any[] = [];
+        let toolCallsLog: ToolCallLog[] = [];
 
         for await (const message of queryInstance) {
           messageCount++;
@@ -86,12 +110,48 @@ export async function POST(req: NextRequest) {
 
             for (const block of content) {
               if (block.type === 'tool_use' && block.name) {
+                // Log tool call
+                toolCallsLog.push({
+                  timestamp: new Date().toISOString(),
+                  type: 'tool_use',
+                  toolName: block.name,
+                  input: block.input || {}
+                });
+
                 const toolMessage = toolMessages[block.name] || 'Claude arbetar...';
                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({
                   type: 'tool',
                   message: toolMessage,
                   tool: block.name
                 })}\n\n`));
+              }
+            }
+          }
+
+          // Detect tool results from user messages (containing tool_result blocks)
+          if (message.type === 'user' && message.message) {
+            const content = Array.isArray(message.message) ? message.message :
+                           (message.message.content ? message.message.content : []);
+
+            for (const block of content) {
+              if (block.type === 'tool_result') {
+                const toolUseId = (block as any).tool_use_id || 'unknown';
+                const isError = (block as any).is_error || false;
+                const resultContent = (block as any).content;
+
+                // Try to extract text from content
+                let textContent = resultContent;
+                if (Array.isArray(resultContent)) {
+                  textContent = resultContent.find((c: any) => c.type === 'text')?.text || resultContent;
+                }
+
+                toolCallsLog.push({
+                  timestamp: new Date().toISOString(),
+                  type: 'tool_result',
+                  toolName: toolUseId,
+                  output: isError ? undefined : textContent,
+                  error: isError ? textContent : undefined
+                });
               }
             }
           }
@@ -105,133 +165,162 @@ export async function POST(req: NextRequest) {
           }
 
           if (message.type === 'result') {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'status', message: 'Behandlar Claudes svar...' })}\n\n`));
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'status', message: 'Läser HTML från arbetsyta...' })}\n\n`));
 
             console.log('Result message:', JSON.stringify(message, null, 2));
 
-            // Extract Claude's response from all messages
-            let presentationData;
-            let claudeResponse = '';
+            // Try to read HTML file from workspace (Claude should have written it)
+            let presentationHTML = await readHtml(workspace);
+            let presentationTitle = userPrompt; // Default to prompt
 
-            // Extract result text directly from result object
-            if (message.subtype === 'success' && 'result' in message && typeof message.result === 'string') {
-              claudeResponse = message.result;
-              console.log('Got result string directly:', claudeResponse.substring(0, 500));
-            }
+            if (presentationHTML) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                type: 'status',
+                message: 'HTML-fil hittad i arbetsyta!'
+              })}\n\n`));
 
-            // Collect all assistant messages
-            for (const msg of allMessages) {
-              console.log('Message type:', msg.type);
+              // Try to extract title from HTML
+              const titleMatch = presentationHTML.match(/<title>(.*?)<\/title>/);
+              if (titleMatch) {
+                presentationTitle = titleMatch[1];
+              }
+            } else {
+              // FALLBACK: If no file was written, try old method
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                type: 'status',
+                message: 'Ingen fil funnen, försöker parse från text...'
+              })}\n\n`));
 
-              if (msg.type === 'assistant') {
-                console.log('Assistant message structure:', JSON.stringify(msg, null, 2).substring(0, 500));
+              let claudeResponse = '';
 
-                // Handle different possible structures
-                if (msg.message && Array.isArray(msg.message)) {
-                  for (const block of msg.message) {
-                    if (block.type === 'text' && block.text) {
-                      claudeResponse += block.text + '\n';
+              // Extract result text
+              if (message.subtype === 'success' && 'result' in message && typeof message.result === 'string') {
+                claudeResponse = message.result;
+              }
+
+              // Collect all assistant messages
+              for (const msg of allMessages) {
+                if (msg.type === 'assistant') {
+                  if (msg.message && Array.isArray(msg.message)) {
+                    for (const block of msg.message) {
+                      if (block.type === 'text' && block.text) {
+                        claudeResponse += block.text + '\n';
+                      }
+                    }
+                  } else if (msg.content && Array.isArray(msg.content)) {
+                    for (const block of msg.content) {
+                      if (block.type === 'text' && block.text) {
+                        claudeResponse += block.text + '\n';
+                      }
                     }
                   }
-                } else if (msg.content && Array.isArray(msg.content)) {
-                  for (const block of msg.content) {
-                    if (block.type === 'text' && block.text) {
-                      claudeResponse += block.text + '\n';
-                    }
-                  }
-                } else if (typeof msg.message === 'string') {
-                  claudeResponse += msg.message + '\n';
-                } else if (typeof msg.content === 'string') {
-                  claudeResponse += msg.content + '\n';
                 }
               }
-            }
 
-            console.log('Claude response length:', claudeResponse.length);
-            console.log('Claude response preview:', claudeResponse.substring(0, 1000));
+              // Try to parse JSON
+              try {
+                const jsonMatch = claudeResponse.match(/```json\s*([\s\S]*?)\s*```/) ||
+                                 claudeResponse.match(/\{[\s\S]*?"sections"[\s\S]*?\}/);
 
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({
-              type: 'status',
-              message: 'Parsar presentationsdata...'
-            })}\n\n`));
+                if (jsonMatch) {
+                  const jsonStr = jsonMatch[1] || jsonMatch[0];
+                  const presentationData = JSON.parse(jsonStr);
 
-            // Try to parse JSON from Claude's response
-            try {
-              // Look for JSON in various formats
-              const jsonMatch = claudeResponse.match(/```json\s*([\s\S]*?)\s*```/) ||
-                               claudeResponse.match(/\{[\s\S]*?"sections"[\s\S]*?\}/);
+                  sections = [
+                    generateTitleSlide(presentationData.title || userPrompt),
+                    ...(presentationData.sections || []),
+                    generateThankYouSlide(),
+                  ];
 
-              if (jsonMatch) {
-                const jsonStr = jsonMatch[1] || jsonMatch[0];
-                presentationData = JSON.parse(jsonStr);
-
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({
-                  type: 'status',
-                  message: `Hittade ${presentationData.sections?.length || 0} slides från Claude!`
-                })}\n\n`));
-              } else {
-                // Fallback: Create a slide with Claude's response
-                console.log('No JSON found, using fallback. Response:', claudeResponse.substring(0, 500));
-
-                presentationData = {
-                  title: userPrompt,
-                  sections: [
+                  presentationHTML = generatePresentationHTML(presentationData.title || userPrompt, sections);
+                  presentationTitle = presentationData.title || userPrompt;
+                } else {
+                  // Ultimate fallback
+                  sections = [
+                    generateTitleSlide(userPrompt),
                     `<section class="slide bg-white items-center justify-center px-16">
                       <img src="/assets/Falkenbergskommun-logo_CMYK_POS_LIGG.png"
                            alt="Falkenbergs kommun" class="slide-logo">
                       <div class="max-w-6xl w-full">
-                        <h2 class="text-5xl font-bold text-gray-900 mb-8">Claude's Svar</h2>
-                        <div class="text-lg text-gray-700 whitespace-pre-wrap">${claudeResponse.substring(0, 1000)}</div>
+                        <h2 class="text-5xl font-bold text-gray-900 mb-8">Fel: Ingen HTML skapad</h2>
+                        <p class="text-lg text-gray-700">Claude skapade ingen presentation.</p>
                       </div>
-                    </section>`
-                  ]
-                };
-
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({
-                  type: 'status',
-                  message: 'Ingen strukturerad data från Claude, skapar fallback-presentation'
-                })}\n\n`));
-              }
-            } catch (error) {
-              console.error('Error parsing presentation data:', error);
-
-              // Error fallback
-              presentationData = {
-                title: userPrompt,
-                sections: [
+                    </section>`,
+                    generateThankYouSlide(),
+                  ];
+                  presentationHTML = generatePresentationHTML(userPrompt, sections);
+                }
+              } catch (error) {
+                console.error('Fallback parsing error:', error);
+                sections = [
+                  generateTitleSlide(userPrompt),
                   `<section class="slide bg-white items-center justify-center px-16">
                     <img src="/assets/Falkenbergskommun-logo_CMYK_POS_LIGG.png"
                          alt="Falkenbergs kommun" class="slide-logo">
                     <div class="max-w-6xl w-full">
-                      <h2 class="text-5xl font-bold text-gray-900 mb-8">Fel vid parsning</h2>
-                      <p class="text-lg text-gray-700">Claude svarade, men formatet kunde inte tolkas.</p>
-                      <pre class="text-sm text-gray-600 mt-4 overflow-auto">${claudeResponse.substring(0, 500)}</pre>
+                      <h2 class="text-5xl font-bold text-gray-900 mb-8">Fel vid skapande</h2>
+                      <p class="text-lg text-gray-700">Ett fel inträffade.</p>
                     </div>
-                  </section>`
-                ]
-              };
+                  </section>`,
+                  generateThankYouSlide(),
+                ];
+                presentationHTML = generatePresentationHTML(userPrompt, sections);
+              }
             }
 
-            // Add title and thank you slides
-            sections = [
-              generateTitleSlide(presentationData.title || userPrompt),
-              ...(presentationData.sections || []),
-              generateThankYouSlide(),
-            ];
+            // Count slides
+            const slideCount = (presentationHTML.match(/<section class="slide/g) || []).length;
 
-            // Generate final HTML
-            const presentationHTML = generatePresentationHTML(presentationData.title || userPrompt, sections);
+            // Save tool calls log to public directory
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const logFileName = `tool-calls-${timestamp}.json`;
+            const logFilePath = join(process.cwd(), 'public', 'logs', logFileName);
 
-            // Send completion with HTML and presentation data
+            try {
+              // Ensure logs directory exists
+              const logsDir = join(process.cwd(), 'public', 'logs');
+              const { mkdirSync } = await import('fs');
+              try {
+                mkdirSync(logsDir, { recursive: true });
+              } catch (e) {
+                // Directory might already exist
+              }
+
+              // Write log file
+              writeFileSync(logFilePath, JSON.stringify({
+                generatedAt: new Date().toISOString(),
+                prompt: userPrompt,
+                model: 'claude-haiku-4-5-20251001',
+                toolCalls: toolCallsLog,
+                summary: {
+                  totalToolCalls: toolCallsLog.filter(t => t.type === 'tool_use').length,
+                  successfulResults: toolCallsLog.filter(t => t.type === 'tool_result' && !t.error).length,
+                  errors: toolCallsLog.filter(t => t.type === 'tool_result' && t.error).length,
+                  toolsUsed: [...new Set(toolCallsLog.filter(t => t.type === 'tool_use').map(t => t.toolName))]
+                }
+              }, null, 2));
+
+              console.log(`Tool calls log saved to: ${logFilePath}`);
+            } catch (logError) {
+              console.error('Failed to save tool calls log:', logError);
+            }
+
+            // Save metadata for tweak operations
+            await saveMetadata(workspace, {
+              title: presentationTitle,
+              slideCount,
+              createdAt: new Date().toISOString(),
+            });
+
+            // Send completion with HTML and session ID
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({
               type: 'complete',
               html: presentationHTML,
-              title: presentationData.title || userPrompt,
-              slideCount: sections.length,
-              presentationData: {
-                title: presentationData.title || userPrompt,
-                sections: presentationData.sections || []
-              }
+              title: presentationTitle,
+              slideCount,
+              sessionId: workspace.sessionId, // IMPORTANT: Include session ID for tweaks
+              workspaceUrl: `/workspaces/${workspace.sessionId}`,
+              toolCallsLogUrl: `/logs/${logFileName}`
             })}\n\n`));
           }
         }
