@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
             mcpServers: {
               'fbg-data-access': mcpServer,
             },
-            model: 'claude-sonnet-4-5-20250929',
+            model: 'claude-haiku-4-5-20251001',
             maxTurns: 50,
             // CRITICAL: Only allow our MCP tools, disable standard tools
             allowedTools: [
