@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -82,11 +82,29 @@ export default function PresentationGenerator() {
               const data = JSON.parse(line.slice(6)) as StatusUpdate;
               setStatusUpdates((prev) => [...prev, data]);
 
-              if (data.type === 'complete' && data.html) {
-                setGeneratedHTML(data.html);
-                setPresentationTitle(data.title || 'Presentation');
-                if (data.presentationData) {
-                  setPresentationData(data.presentationData);
+              if (data.type === 'complete') {
+                // Support both html (direct) and htmlBase64 (encoded)
+                let html = data.html;
+                if (!html && (data as any).htmlBase64) {
+                  try {
+                    // Decode base64 with proper UTF-8 handling
+                    const binaryString = atob((data as any).htmlBase64);
+                    const bytes = new Uint8Array(binaryString.length);
+                    for (let i = 0; i < binaryString.length; i++) {
+                      bytes[i] = binaryString.charCodeAt(i);
+                    }
+                    html = new TextDecoder('utf-8').decode(bytes);
+                  } catch (e) {
+                    console.error('Failed to decode base64 HTML:', e);
+                  }
+                }
+
+                if (html) {
+                  setGeneratedHTML(html);
+                  setPresentationTitle(data.title || 'Presentation');
+                  if (data.presentationData) {
+                    setPresentationData(data.presentationData);
+                  }
                 }
               }
             } catch (e) {
@@ -131,6 +149,14 @@ export default function PresentationGenerator() {
       doc.close();
     }
   };
+
+  // Auto-update preview when HTML changes
+  useEffect(() => {
+    if (generatedHTML && iframeRef.current) {
+      handlePreview();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [generatedHTML]);
 
   const handleFullscreen = () => {
     if (!iframeRef.current) return;
@@ -187,11 +213,28 @@ export default function PresentationGenerator() {
               const data = JSON.parse(line.slice(6)) as StatusUpdate;
               setStatusUpdates((prev) => [...prev, data]);
 
-              if (data.type === 'complete' && data.html) {
-                setGeneratedHTML(data.html);
-                setPresentationTitle(data.title || presentationTitle);
-                if (data.presentationData) {
-                  setPresentationData(data.presentationData);
+              if (data.type === 'complete') {
+                // Decode Base64 HTML with proper UTF-8 handling
+                const htmlBase64 = (data as any).htmlBase64;
+                if (htmlBase64) {
+                  try {
+                    // Decode base64 to binary string
+                    const binaryString = atob(htmlBase64);
+                    // Convert binary string to Uint8Array
+                    const bytes = new Uint8Array(binaryString.length);
+                    for (let i = 0; i < binaryString.length; i++) {
+                      bytes[i] = binaryString.charCodeAt(i);
+                    }
+                    // Decode UTF-8 bytes to string
+                    const html = new TextDecoder('utf-8').decode(bytes);
+                    setGeneratedHTML(html);
+                    setPresentationTitle(data.title || presentationTitle);
+                    if (data.presentationData) {
+                      setPresentationData(data.presentationData);
+                    }
+                  } catch (decodeError) {
+                    console.error('Failed to decode Base64 HTML:', decodeError);
+                  }
                 }
               }
             } catch (e) {

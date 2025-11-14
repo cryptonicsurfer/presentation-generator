@@ -227,8 +227,6 @@ export async function POST(req: NextRequest) {
               }
             }
 
-            console.log('Tweak response:', claudeResponse.substring(0, 1000));
-
             // Parse JSON response
             try {
               const jsonMatch = claudeResponse.match(/```json\s*([\s\S]*?)\s*```/) ||
@@ -270,10 +268,13 @@ export async function POST(req: NextRequest) {
               sections
             );
 
+            // Base64 encode HTML to safely send via SSE
+            const htmlBase64 = Buffer.from(presentationHTML).toString('base64');
+
             // Send completion
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({
               type: 'complete',
-              html: presentationHTML,
+              htmlBase64,
               title: modifiedData.title || presentationData.title,
               slideCount: sections.length,
               presentationData: {

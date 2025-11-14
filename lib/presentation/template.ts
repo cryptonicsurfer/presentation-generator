@@ -2,12 +2,32 @@
  * Generate the base HTML template for presentations
  */
 export function generatePresentationHTML(title: string, sections: string[]): string {
+  // AGGRESSIVELY remove ALL <script> tags from Claude-generated sections
+  let totalScriptsRemoved = 0;
+  const cleanedSections = sections.map((section, index) => {
+    const before = section.length;
+
+    let cleaned = section;
+    cleaned = cleaned.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+    cleaned = cleaned.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+    cleaned = cleaned.replace(/<script[\s\S]*?<\/script>/gi, '');
+
+    const after = cleaned.length;
+    if (before !== after) {
+      totalScriptsRemoved++;
+      console.log(`[Template] Section ${index}: Removed ${before - after} chars of <script> tags`);
+    }
+
+    return cleaned;
+  });
+
   return `<!DOCTYPE html>
 <html lang="sv">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${title} - Falkenberg Kommun</title>
+    <!-- Script tags removed from ${totalScriptsRemoved} sections to prevent conflicts -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -157,57 +177,71 @@ export function generatePresentationHTML(title: string, sections: string[]): str
 
     <!-- Slides Container -->
     <div id="slides-container">
-        ${sections.join('\n')}
+        ${cleanedSections.join('\n')}
     </div>
 
     <script>
+      (function () {
         let currentSlide = 0;
         let slides = [];
 
         function initSlides() {
-            slides = Array.from(document.querySelectorAll('.slide'));
-            document.getElementById('total-slides').textContent = slides.length;
-            if (slides.length > 0) {
-                showSlide(0);
-            }
+          slides = Array.from(document.querySelectorAll('.slide'));
+          const totalEl = document.getElementById('total-slides');
+          if (totalEl) totalEl.textContent = String(slides.length);
+
+          if (slides.length > 0) {
+            showSlide(0);
+          }
         }
 
         function showSlide(n) {
-            slides.forEach(slide => slide.classList.remove('active'));
+          if (!slides || slides.length === 0) return;
 
-            if (n >= slides.length) n = 0;
-            if (n < 0) n = slides.length - 1;
+          slides.forEach(slide => slide.classList.remove('active'));
 
-            currentSlide = n;
-            slides[currentSlide].classList.add('active');
-            document.getElementById('current-slide').textContent = currentSlide + 1;
+          if (n >= slides.length) n = 0;
+          if (n < 0) n = slides.length - 1;
 
-            lucide.createIcons();
+          currentSlide = n;
+          slides[currentSlide].classList.add('active');
+
+          const currentEl = document.getElementById('current-slide');
+          if (currentEl) currentEl.textContent = String(currentSlide + 1);
+
+          if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            window.lucide.createIcons();
+          }
         }
 
         function nextSlide() {
-            showSlide(currentSlide + 1);
+          showSlide(currentSlide + 1);
         }
 
         function prevSlide() {
-            showSlide(currentSlide - 1);
+          showSlide(currentSlide - 1);
         }
 
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'ArrowRight' || e.key === ' ') {
-                e.preventDefault();
-                nextSlide();
-            } else if (e.key === 'ArrowLeft') {
-                e.preventDefault();
-                prevSlide();
-            }
+          if (e.key === 'ArrowRight' || e.key === ' ') {
+            e.preventDefault();
+            nextSlide();
+          } else if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            prevSlide();
+          }
         });
 
-        document.getElementById('next-btn').addEventListener('click', nextSlide);
-        document.getElementById('prev-btn').addEventListener('click', prevSlide);
+        window.addEventListener('DOMContentLoaded', () => {
+          const nextBtn = document.getElementById('next-btn');
+          const prevBtn = document.getElementById('prev-btn');
 
-        initSlides();
-        lucide.createIcons();
+          nextBtn?.addEventListener('click', nextSlide);
+          prevBtn?.addEventListener('click', prevSlide);
+
+          initSlides();
+        });
+      })();
     </script>
 </body>
 </html>`;
