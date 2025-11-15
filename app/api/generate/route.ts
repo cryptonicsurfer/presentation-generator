@@ -144,12 +144,18 @@ async function generateWithGemini(
     message: 'Parsar Geminis svar...'
   })}\n\n`));
 
+  // Log what Gemini returned for debugging
+  console.log('[Gemini Response] First 1000 chars:', result.substring(0, 1000));
+  console.log('[Gemini Response] Last 500 chars:', result.substring(Math.max(0, result.length - 500)));
+  console.log('[Gemini Response] Total length:', result.length);
+
   // Parse Gemini's JSON response
   let presentationData;
   let presentationTitle = userPrompt;
   let sections: string[] = [];
 
   try {
+    // Try to parse JSON from Gemini's response (same as working gemini-agents branch)
     const jsonMatch = result.match(/```json\s*([\s\S]*?)\s*```/) ||
                      result.match(/\{[\s\S]*?"sections"[\s\S]*?\}/);
 
@@ -169,6 +175,7 @@ async function generateWithGemini(
         message: `Skapade ${presentationData.sections?.length || 0} slides från Gemini!`
       })}\n\n`));
     } else {
+      // Fallback: Create error slide
       console.log('No JSON found in Gemini response:', result.substring(0, 500));
       sections = [
         generateTitleSlide(userPrompt),
@@ -190,6 +197,8 @@ async function generateWithGemini(
     }
   } catch (error) {
     console.error('Error parsing Gemini presentation data:', error);
+
+    // Error fallback
     sections = [
       generateTitleSlide(userPrompt),
       `<section class="slide bg-white items-center justify-center px-16">
