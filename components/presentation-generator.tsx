@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Download, Eye, Sparkles, Maximize2, FileJson } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Loader2, Download, Eye, Sparkles, Maximize2, FileJson, Moon, Sun } from 'lucide-react';
 
 type StatusUpdate = {
   type: 'status' | 'tool' | 'thinking' | 'error' | 'complete';
@@ -50,6 +51,8 @@ function ShimmerContainer({ active, radius = '1.5rem', className, children }: Sh
 
 export default function PresentationGenerator() {
   const [prompt, setPrompt] = useState('');
+  const [backend, setBackend] = useState<'claude' | 'gemini'>('gemini');
+  const [darkMode, setDarkMode] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [statusUpdates, setStatusUpdates] = useState<StatusUpdate[]>([]);
   const [generatedHTML, setGeneratedHTML] = useState<string | null>(null);
@@ -92,7 +95,7 @@ export default function PresentationGenerator() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ prompt, backend }),
       });
 
       if (!response.ok) {
@@ -196,6 +199,15 @@ export default function PresentationGenerator() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [generatedHTML]);
 
+  // Dark mode toggle
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [darkMode]);
+
   const handleFullscreen = () => {
     if (!iframeRef.current) return;
 
@@ -226,6 +238,7 @@ export default function PresentationGenerator() {
         body: JSON.stringify({
           tweakPrompt,
           presentationData,
+          backend,
         }),
       });
 
@@ -301,9 +314,24 @@ export default function PresentationGenerator() {
       <div className="max-w-[1800px] mx-auto">
         {/* Header */}
         <div className="text-center mb-6">
-          <div className="flex items-center justify-center gap-3 mb-2">
+          <div className="flex items-center justify-center gap-3 mb-2 relative">
             <Sparkles className="w-10 h-10 text-gray-600" />
             <h1 className="text-5xl font-bold text-gray-900">Presentation Generator</h1>
+
+            {/* Dark Mode Toggle - Positioned absolutely to the right */}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setDarkMode(!darkMode)}
+              className="absolute right-0"
+              title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            >
+              {darkMode ? (
+                <Sun className="w-5 h-5" />
+              ) : (
+                <Moon className="w-5 h-5" />
+              )}
+            </Button>
           </div>
         </div>
 
@@ -319,6 +347,36 @@ export default function PresentationGenerator() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* Backend Selector */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">
+                    AI-modell
+                  </label>
+                  <Select
+                    value={backend}
+                    onValueChange={(value) => setBackend(value as 'claude' | 'gemini')}
+                    disabled={isGenerating}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Välj AI-modell" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="gemini">
+                        <div className="flex flex-col items-start">
+                          <span className="font-medium">Gemini 2.5 Flash</span>
+                          <span className="text-xs text-gray-500">Snabbare, billigare</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="claude">
+                        <div className="flex flex-col items-start">
+                          <span className="font-medium">Claude Sonnet 4.5</span>
+                          <span className="text-xs text-gray-500">Mer pålitlig, bättre resonemang</span>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 <Textarea
                   placeholder="Exempel: Skapa en företagsrapport för Randek AB med senaste finansiella data och möteshistorik..."
                   value={prompt}
@@ -374,7 +432,9 @@ export default function PresentationGenerator() {
               <Card>
                 <CardHeader>
                   <CardTitle>Status</CardTitle>
-                  <CardDescription>Claude arbetar med din presentation</CardDescription>
+                  <CardDescription>
+                    {backend === 'claude' ? 'Claude Sonnet 4.5' : 'Gemini 2.5 Flash'} arbetar med din presentation
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3 max-h-96 overflow-y-auto">
