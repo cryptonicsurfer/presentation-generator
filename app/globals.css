@@ -1,3 +1,4 @@
+
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -121,55 +122,8 @@
   }
 }
 
-.shimmer-ring {
-  position: relative;
-  border-radius: var(--shimmer-radius, 1.25rem);
-}
-
-.shimmer-ring::before,
-.shimmer-ring::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 2px;
-  background: linear-gradient(
-    100deg,
-    rgba(255, 255, 255, 0),
-    rgba(255, 255, 255, 0.8),
-    rgba(255, 255, 255, 0)
-  );
-  background-size: 230% 100%;
-  animation: shimmerSweep var(--shimmer-speed, 2.8s) ease-in-out infinite;
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-          mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-          mask-composite: exclude;
-  opacity: 0.75;
-  pointer-events: none;
-}
-
-.shimmer-ring::after {
-  animation-delay: calc(var(--shimmer-speed, 2.8s) / 2);
-  opacity: 0.35;
-}
-
-.shimmer-ring > * {
-  position: relative;
-  border-radius: calc(var(--shimmer-radius, 1.25rem) - 4px);
-  background-clip: padding-box;
-  z-index: 1;
-}
-
-@keyframes shimmerSweep {
-  0% {
-    background-position: -150% 0;
-  }
-  100% {
-    background-position: 150% 0;
-  }
+/* Added styles for modal */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
