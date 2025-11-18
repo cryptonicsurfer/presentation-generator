@@ -5,7 +5,7 @@ import { join } from 'path';
  * Load skills from the existing Claude Code setup
  */
 export async function loadSkills() {
-  const skillsBasePath = '/Users/paulklinteby/presentation-generator/.claude/skills';
+  const skillsBasePath = join(process.cwd(), '.claude', 'skills');
 
   try {
     const fbgPostgresSkill = await readFile(
