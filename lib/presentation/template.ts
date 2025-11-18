@@ -12,6 +12,17 @@ export function generatePresentationHTML(title: string, sections: string[]): str
     cleaned = cleaned.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
     cleaned = cleaned.replace(/<script[\s\S]*?<\/script>/gi, '');
 
+    // Inject unique ID if not present
+    // We use index + 1 because title slide will be slide-0 (or we can make title slide slide-1)
+    // Let's make Title = slide-0, Content = slide-1..N, Thank You = slide-N+1
+    // But here 'sections' are just the content slides.
+    // The actual full list is assembled in the route handler usually.
+    // Wait, the route handler calls generatePresentationHTML with the FULL list including title/thankyou.
+    // Let's just inject IDs based on the loop index.
+    if (!cleaned.includes('id="slide-')) {
+      cleaned = cleaned.replace(/<section class="slide/, `<section id="slide-${index}" class="slide`);
+    }
+
     const after = cleaned.length;
     if (before !== after) {
       totalScriptsRemoved++;
@@ -253,7 +264,7 @@ export function generatePresentationHTML(title: string, sections: string[]): str
 export function generateTitleSlide(title: string, subtitle?: string, date?: string): string {
   const displayDate = date || new Date().toLocaleDateString('sv-SE', { year: 'numeric', month: 'long', day: 'numeric' });
 
-  return `<section class="slide bg-gradient-to-br from-falkenberg-kommunblå to-falkenberg-marinblå items-center justify-center">
+  return `<section id="slide-title" class="slide bg-gradient-to-br from-falkenberg-kommunblå to-falkenberg-marinblå items-center justify-center">
     <img src="https://kommun.falkenberg.se/document/om-kommunen/grafisk-profil/kommunens-logotyper/liggande-logotyper-foer-tryck/1610-falkenbergskommun-logo-vit-ligg"
          alt="Falkenbergs kommun" class="slide-logo">
     <div class="text-center text-white px-16">
@@ -268,7 +279,7 @@ export function generateTitleSlide(title: string, subtitle?: string, date?: stri
  * Generate a thank you slide
  */
 export function generateThankYouSlide(): string {
-  return `<section class="slide bg-gradient-to-br from-falkenberg-ängsgrön to-falkenberg-havsvik items-center justify-center">
+  return `<section id="slide-thankyou" class="slide bg-gradient-to-br from-falkenberg-ängsgrön to-falkenberg-havsvik items-center justify-center">
     <img src="https://kommun.falkenberg.se/document/om-kommunen/grafisk-profil/kommunens-logotyper/liggande-logotyper-foer-tryck/1610-falkenbergskommun-logo-vit-ligg"
          alt="Falkenbergs kommun" class="slide-logo">
     <div class="text-center text-white px-16">

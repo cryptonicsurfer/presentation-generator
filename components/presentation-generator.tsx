@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Loader2, Download, Eye, Maximize2, FileJson, Sparkles } from 'lucide-react';
 import type { ModelInfo } from '@/app/api/models/route';
 import { formatCost } from '@/lib/pricing';
+import { ChatInterface, type Message } from './chat-interface';
 
 type StatusUpdate = {
   type: 'status' | 'tool' | 'thinking' | 'error' | 'complete';
@@ -67,7 +68,7 @@ export default function PresentationGenerator() {
   const [generatedHTML, setGeneratedHTML] = useState<string | null>(null);
   const [presentationTitle, setPresentationTitle] = useState<string>('');
   const [presentationData, setPresentationData] = useState<{ title: string; sections: string[] } | null>(null);
-  const [tweakPrompt, setTweakPrompt] = useState('');
+  const [messages, setMessages] = useState<Message[]>([]);
   const [isTweaking, setIsTweaking] = useState(false);
   const [toolCallsLogUrl, setToolCallsLogUrl] = useState<string | null>(null);
   const [usageData, setUsageData] = useState<{ inputTokens: number; outputTokens: number; totalTokens: number; cost: number } | null>(null);
@@ -118,6 +119,7 @@ export default function PresentationGenerator() {
     setGeneratedHTML(null);
     setPresentationTitle('');
     setPresentationData(null);
+    setMessages([]); // Reset chat history on new generation
 
     try {
       const response = await fetch('/api/generate', {
@@ -248,9 +250,15 @@ export default function PresentationGenerator() {
     }
   };
 
-  const handleTweak = async () => {
-    if (!tweakPrompt.trim() || !presentationData) return;
+  const handleTweak = async (messageContent: string) => {
+    if (!messageContent.trim() || !presentationData) return;
 
+    // Add user message to history
+    const newMessages: Message[] = [
+      ...messages,
+      { role: 'user', content: messageContent, timestamp: Date.now() }
+    ];
+    setMessages(newMessages);
     setIsTweaking(true);
     setStatusUpdates([]);
 
@@ -261,7 +269,7 @@ export default function PresentationGenerator() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          tweakPrompt,
+          messages: newMessages.map(m => ({ role: m.role, content: m.content })),
           presentationData,
           model: selectedModel,
         }),
@@ -326,15 +334,26 @@ export default function PresentationGenerator() {
           }
         }
       }
+
+      // Add assistant completion message
+      setMessages(prev => [
+        ...prev,
+        { role: 'assistant', content: 'Presentation updated successfully!', timestamp: Date.now() }
+      ]);
+
     } catch (error) {
       console.error('Error:', error);
       setStatusUpdates((prev) => [
         ...prev,
         { type: 'error', message: 'Ett fel inträffade vid justering av presentation' },
       ]);
+      // Add error message to chat
+      setMessages(prev => [
+        ...prev,
+        { role: 'assistant', content: 'Sorry, I encountered an error while updating the presentation.', timestamp: Date.now() }
+      ]);
     } finally {
       setIsTweaking(false);
-      setTweakPrompt('');
     }
   };
 
@@ -345,124 +364,124 @@ export default function PresentationGenerator() {
           {/* Left Column: Input */}
           <div className="xl:col-span-2 space-y-6">
             <ShimmerContainer active={shouldHighlightPrompt}>
-            <Card>
-              <CardHeader>
-                <CardTitle>Vad vill du skapa?</CardTitle>
-                <CardDescription>
-                  Beskriv vilken presentation du vill generera
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Model Selector */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground/80 dark:text-foreground">
-                    AI-modell
-                  </label>
-                  <Select
-                    value={selectedModel}
-                    onValueChange={setSelectedModel}
-                    disabled={isGenerating || availableModels.length === 0}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Välj AI-modell" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableModels.map((model) => (
-                        <SelectItem key={model.id} value={model.id}>
-                          <div className="flex flex-col items-start">
-                            <span className="font-medium">{model.name}</span>
-                            <span className="text-xs text-muted-foreground">{model.description}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <Textarea
-                  placeholder="Exempel: Skapa en företagsrapport för Randek AB med senaste finansiella data och möteshistorik..."
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  rows={6}
-                  className="resize-none"
-                  disabled={isGenerating}
-                />
-
-                <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">Exempel på prompts:</p>
-                  <div className="flex flex-wrap gap-2">
-                  {examplePrompts.map((example, i) => (
-                    <Button
-                    key={i}
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPrompt(example)}
-                    disabled={isGenerating}
-                    className="line-clamp-2"
+              <Card>
+                <CardHeader>
+                  <CardTitle>Vad vill du skapa?</CardTitle>
+                  <CardDescription>
+                    Beskriv vilken presentation du vill generera
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Model Selector */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground/80 dark:text-foreground">
+                      AI-modell
+                    </label>
+                    <Select
+                      value={selectedModel}
+                      onValueChange={setSelectedModel}
+                      disabled={isGenerating || availableModels.length === 0}
                     >
-                    {example}
-                    </Button>
-                  ))}
+                      <SelectTrigger>
+                        <SelectValue placeholder="Välj AI-modell" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableModels.map((model) => (
+                          <SelectItem key={model.id} value={model.id}>
+                            <div className="flex flex-col items-start">
+                              <span className="font-medium">{model.name}</span>
+                              <span className="text-xs text-muted-foreground">{model.description}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                </div>
 
-                <Button
-                  onClick={handleGenerate}
-                  disabled={isGenerating || !prompt.trim()}
-                  className="w-full"
-                  size="lg"
-                >
-                  {isGenerating ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Genererar...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-4 h-4" />
-                      Generera Presentation
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
+                  <Textarea
+                    placeholder="Exempel: Skapa en företagsrapport för Randek AB med senaste finansiella data och möteshistorik..."
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    rows={6}
+                    className="resize-none"
+                    disabled={isGenerating}
+                  />
+
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">Exempel på prompts:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {examplePrompts.map((example, i) => (
+                        <Button
+                          key={i}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPrompt(example)}
+                          disabled={isGenerating}
+                          className="line-clamp-2"
+                        >
+                          {example}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <Button
+                    onClick={handleGenerate}
+                    disabled={isGenerating || !prompt.trim()}
+                    className="w-full"
+                    size="lg"
+                  >
+                    {isGenerating ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Genererar...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4" />
+                        Generera Presentation
+                      </>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
             </ShimmerContainer>
 
             {/* Status Updates */}
             {statusUpdates.length > 0 && (
               <ShimmerContainer active={shouldHighlightStatus}>
-              <Card>
-                <CardHeader>
-                  <CardTitle>Status</CardTitle>
-                  <CardDescription>
-                    {availableModels.find(m => m.id === selectedModel)?.name || 'AI-modellen'} arbetar med din presentation
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3 max-h-96 overflow-y-auto">
-                    {statusUpdates.map((update, i) => (
-                      <div key={i} className="flex items-start gap-3">
-                        {update.type === 'status' && (
-                          <Badge variant="secondary">Status</Badge>
-                        )}
-                        {update.type === 'tool' && (
-                          <Badge className="bg-blue-500">Verktyg</Badge>
-                        )}
-                        {update.type === 'thinking' && (
-                          <Badge className="bg-purple-500">Tänker</Badge>
-                        )}
-                        {update.type === 'complete' && (
-                          <Badge className="bg-green-500">Klar</Badge>
-                        )}
-                        {update.type === 'error' && (
-                          <Badge variant="destructive">Fel</Badge>
-                        )}
-                        <p className="text-sm text-foreground/80 flex-1">{update.message}</p>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Status</CardTitle>
+                    <CardDescription>
+                      {availableModels.find(m => m.id === selectedModel)?.name || 'AI-modellen'} arbetar med din presentation
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                      {statusUpdates.map((update, i) => (
+                        <div key={i} className="flex items-start gap-3">
+                          {update.type === 'status' && (
+                            <Badge variant="secondary">Status</Badge>
+                          )}
+                          {update.type === 'tool' && (
+                            <Badge className="bg-blue-500">Verktyg</Badge>
+                          )}
+                          {update.type === 'thinking' && (
+                            <Badge className="bg-purple-500">Tänker</Badge>
+                          )}
+                          {update.type === 'complete' && (
+                            <Badge className="bg-green-500">Klar</Badge>
+                          )}
+                          {update.type === 'error' && (
+                            <Badge variant="destructive">Fel</Badge>
+                          )}
+                          <p className="text-sm text-foreground/80 flex-1">{update.message}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
               </ShimmerContainer>
             )}
           </div>
@@ -470,42 +489,42 @@ export default function PresentationGenerator() {
           {/* Right Column: Preview */}
           <div className="xl:col-span-3">
             <ShimmerContainer active={shouldHighlightPreview} radius="1.75rem">
-            <Card className="h-full">
-              <CardHeader>
-                <CardTitle>Förhandsvisning</CardTitle>
-                <CardDescription>
+              <Card className="h-full">
+                <CardHeader>
+                  <CardTitle>Förhandsvisning</CardTitle>
+                  <CardDescription>
+                    {generatedHTML ? (
+                      <>
+                        <div>{presentationTitle} ({statusUpdates.find((u) => u.type === 'complete')?.slideCount || 0} slides)</div>
+                        {usageData && (
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {usageData.inputTokens.toLocaleString()} in · {usageData.outputTokens.toLocaleString()} out · {usageData.totalTokens.toLocaleString()} total · ${formatCost(usageData.cost)}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      'Din presentation kommer att visas här'
+                    )}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
                   {generatedHTML ? (
                     <>
-                      <div>{presentationTitle} ({statusUpdates.find((u) => u.type === 'complete')?.slideCount || 0} slides)</div>
-                      {usageData && (
-                        <div className="text-xs text-muted-foreground mt-1">
-                          {usageData.inputTokens.toLocaleString()} in · {usageData.outputTokens.toLocaleString()} out · {usageData.totalTokens.toLocaleString()} total · ${formatCost(usageData.cost)}
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    'Din presentation kommer att visas här'
-                  )}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {generatedHTML ? (
-                  <>
-                    <div className="flex gap-2">
-                      <Button onClick={handlePreview} variant="outline" className="flex-1">
-                        <Eye className="w-4 h-4" />
-                        Visa
-                      </Button>
-                      <Button onClick={handleFullscreen} variant="outline" className="flex-1">
-                        <Maximize2 className="w-4 h-4" />
-                        Fullscreen
-                      </Button>
-                      <Button onClick={handleDownload} className="flex-1">
-                        <Download className="w-4 h-4" />
-                        Ladda ner HTML
-                      </Button>
-                    </div>
-{/* 
+                      <div className="flex gap-2">
+                        <Button onClick={handlePreview} variant="outline" className="flex-1">
+                          <Eye className="w-4 h-4" />
+                          Visa
+                        </Button>
+                        <Button onClick={handleFullscreen} variant="outline" className="flex-1">
+                          <Maximize2 className="w-4 h-4" />
+                          Fullscreen
+                        </Button>
+                        <Button onClick={handleDownload} className="flex-1">
+                          <Download className="w-4 h-4" />
+                          Ladda ner HTML
+                        </Button>
+                      </div>
+                      {/* 
                     {toolCallsLogUrl && (
                       <div className="mt-2">
                         <Button
@@ -523,88 +542,48 @@ export default function PresentationGenerator() {
                       </div>
                     )} */}
 
-                    <div className="w-full aspect-[16/9] border-2 border-border/40 dark:border-border/60 rounded-lg overflow-hidden bg-card shadow-2xl transition-colors">
-                      <iframe
-                        ref={iframeRef}
-                        className="w-full h-full"
-                        title="Presentation Preview"
-                        style={{ transform: 'scale(1)', transformOrigin: 'top left' }}
-                      />
+                      <div className="w-full aspect-[16/9] border-2 border-border/40 dark:border-border/60 rounded-lg overflow-hidden bg-card shadow-2xl transition-colors">
+                        <iframe
+                          ref={iframeRef}
+                          className="w-full h-full"
+                          title="Presentation Preview"
+                          style={{ transform: 'scale(1)', transformOrigin: 'top left' }}
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex items-center justify-center w-full aspect-[16/9] border-2 border-dashed border-border/40 dark:border-border/60 rounded-lg transition-colors">
+                      <div className="text-center text-muted-foreground">
+                        <Sparkles className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                        <p className="text-lg">Väntar på generering...</p>
+                      </div>
                     </div>
-                  </>
-                ) : (
-                  <div className="flex items-center justify-center w-full aspect-[16/9] border-2 border-dashed border-border/40 dark:border-border/60 rounded-lg transition-colors">
-                    <div className="text-center text-muted-foreground">
-                      <Sparkles className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                      <p className="text-lg">Väntar på generering...</p>
-                    </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Tweak Presentation - Always visible, disabled until presentation is ready */}
-                <div className="mt-6">
-                  <ShimmerContainer active={shouldHighlightTweakArea} radius="1.25rem">
-                  <div className="pt-6 border-t border-border/40 dark:border-border/60">
-                  <h3 className={`text-lg font-semibold mb-2 ${!generatedHTML ? 'text-muted-foreground/70' : 'text-foreground'}`}>
-                    Justera Presentation (efter generering är gjord)
-                  </h3>
-                  {/* <p className={`text-sm mb-4 ${!generatedHTML ? 'text-gray-400' : 'text-gray-600'}`}>
+                  {/* Tweak Presentation - Always visible, disabled until presentation is ready */}
+                  <div className="mt-6">
+                    <ShimmerContainer active={shouldHighlightTweakArea} radius="1.25rem">
+                      <div className="pt-6 border-t border-border/40 dark:border-border/60">
+                        <h3 className={`text-lg font-semibold mb-2 ${!generatedHTML ? 'text-muted-foreground/70' : 'text-foreground'}`}>
+                          Justera Presentation (efter generering är gjord)
+                        </h3>
+                        {/* <p className={`text-sm mb-4 ${!generatedHTML ? 'text-gray-400' : 'text-gray-600'}`}>
                     Beskriv ändringar du vill göra (använder diff editing för snabbare resultat)
                   </p> */}
 
-                  <div className="space-y-2">
-                    <Textarea
-                      placeholder={generatedHTML ? "Exempel: Lägg till en slide med finansiell jämförelse mot föregående år..." : "Väntar på presentation..."}
-                      value={tweakPrompt}
-                      onChange={(e) => setTweakPrompt(e.target.value)}
-                      rows={3}
-                      className="resize-none"
-                      disabled={!generatedHTML || isTweaking}
-                    />
-
-                    <div className="space-y-2">
-                      {/* <p className={`text-sm ${!generatedHTML ? 'text-gray-400' : 'text-gray-600'}`}>
-                        Exempel på justeringar:
-                      </p> */}
-                      <div className="flex flex-wrap gap-2">
-                        {exampleTweakPrompts.map((example, i) => (
-                          <Button
-                            key={i}
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setTweakPrompt(example)}
-                            disabled={!generatedHTML || isTweaking}
-                          >
-                            {example}
-                          </Button>
-                        ))}
+                        <div className="space-y-2">
+                          <ChatInterface
+                            messages={messages}
+                            onSendMessage={handleTweak}
+                            isTweaking={isTweaking}
+                            disabled={!generatedHTML}
+                          />
+                        </div>
                       </div>
-                    </div>
-
-                    <Button
-                      onClick={handleTweak}
-                      disabled={!generatedHTML || isTweaking || !tweakPrompt.trim()}
-                      className="w-full"
-                      size="lg"
-                    >
-                      {isTweaking ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Justerar...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="w-4 h-4" />
-                          Justera Presentation
-                        </>
-                      )}
-                    </Button>
+                    </ShimmerContainer>
                   </div>
-                </div>
-                  </ShimmerContainer>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
             </ShimmerContainer>
           </div>
         </div>

@@ -330,54 +330,48 @@ BE THOROUGH! Use multiple queries, analyze trends, and create a comprehensive 10
 /**
  * Generate system prompt for Gemini tweak operations (diff-edits)
  */
+/**
+ * Generate system prompt for Gemini tweak operations (diff-edits)
+ */
 export async function generateGeminiTweakPrompt(
-  userQuery: string,
+  history: { role: string; content: string }[],
   currentHTML: string,
   originalTitle: string
 ): Promise<string> {
-  return `You are a presentation editing assistant. Make MINIMAL, PRECISE changes to an existing presentation.
+  const lastUserMessage = history[history.length - 1]?.content || '';
+  const previousContext = history.slice(0, -1).map(msg => `${msg.role.toUpperCase()}: ${msg.content}`).join('\n');
 
-# User's Request
+  return `You are a presentation editing assistant. You help users modify an existing HTML presentation.
 
-"${userQuery}"
+# Conversation History
+${previousContext}
 
-# Current Presentation
+# Current Request
+"${lastUserMessage}"
 
+# Current Presentation State
 Original title: ${originalTitle}
 
-Here is the current HTML:
-
+Here is the current HTML structure (with IDs):
 \`\`\`html
 ${currentHTML}
 \`\`\`
 
 # Your Task
-
-Make ONLY the changes requested. Use a diff-edit approach:
-
-1. **Identify** - Find the exact text that needs to change
-2. **Replace** - Determine the new text
-3. **Return** - Provide old_string and new_string pairs
-
-# Available Tools
-
-If the user requests NEW or UPDATED data from databases:
-- query_fbg_analytics
-- search_directus_companies
-- count_directus_meetings
-- get_directus_contacts
-
-Otherwise, just modify the existing HTML.
+Analyze the request and the history. Determine what needs to change.
+You can either:
+1. **Update specific slides by ID** (Preferred & Most Robust)
+2. **Global Search & Replace** (Use only for global style changes)
 
 # Output Format
-
 Return a JSON object with this structure:
 
 \`\`\`json
 {
   "edits": [
     {
-      "old_string": "exact text to find in HTML",
+      "target_id": "slide-1", // OPTIONAL: If specified, 'old_string' is searched ONLY within this element.
+      "old_string": "exact text to find",
       "new_string": "replacement text"
     }
   ],
@@ -385,30 +379,30 @@ Return a JSON object with this structure:
 }
 \`\`\`
 
-IMPORTANT:
-- old_string must match EXACTLY (including whitespace)
-- Make minimal changes (only what user requested)
-- Keep same styling and structure
-- Use Swedish language
+# Rules
+1. **ID Targeting**: If the user asks to change "slide 2" or "the financial slide", look at the HTML to find the correct ID (e.g., id="slide-1") and use "target_id": "slide-1".
+2. **Precision**: 'old_string' must match EXACTLY.
+3. **Context**: If the user says "make *it* blue", refer to the history to know what "*it*" is.
+4. **Tools**: You can use tools (query_fbg_analytics, etc.) to fetch new data if requested.
 
 # Example
-
-User: "Ändra rubriken till 'Nya Nyckeltal'"
+User: "Change the title on slide 2 to 'Growth'"
+HTML has: <section id="slide-1">...<h2>Old Title</h2>...</section>
 
 Response:
 \`\`\`json
 {
   "edits": [
     {
-      "old_string": "<h2 class=\\"text-5xl font-bold text-gray-900\\">Nyckeltal</h2>",
-      "new_string": "<h2 class=\\"text-5xl font-bold text-gray-900\\">Nya Nyckeltal</h2>"
+      "target_id": "slide-1",
+      "old_string": "<h2>Old Title</h2>",
+      "new_string": "<h2>Growth</h2>"
     }
   ],
-  "changesSummary": "Ändrade rubrik till 'Nya Nyckeltal'"
+  "changesSummary": "Ändrade rubrik på slide 2"
 }
 \`\`\`
 
 # Start Now
-
 Analyze the request and provide the necessary edits!`;
 }

@@ -17,10 +17,14 @@ export async function POST(req: NextRequest) {
     async start(controller) {
       try {
         const body = await req.json();
-        const { tweakPrompt, presentationData: originalPresentationData } = body;
+        const { messages, presentationData: originalPresentationData } = body;
 
-        if (!tweakPrompt || !originalPresentationData) {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', message: 'Tweak prompt and presentation data are required' })}\n\n`));
+        // Support legacy single-prompt requests
+        const tweakPrompt = body.tweakPrompt;
+        const history = messages || (tweakPrompt ? [{ role: 'user', content: tweakPrompt }] : []);
+
+        if (!history.length || !originalPresentationData) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', message: 'Messages and presentation data are required' })}\n\n`));
           controller.close();
           return;
         }
@@ -48,7 +52,7 @@ export async function POST(req: NextRequest) {
         const currentHTML = generatePresentationHTML(currentTitle, fullSections);
 
         // Generate tweak-specific system prompt
-        const systemPrompt = await generateGeminiTweakPrompt(tweakPrompt, currentHTML, currentTitle);
+        const systemPrompt = await generateGeminiTweakPrompt(history, currentHTML, currentTitle);
 
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'status', message: 'Ansluter till Gemini...' })}\n\n`));
 
@@ -70,7 +74,8 @@ export async function POST(req: NextRequest) {
         };
 
         // Run Gemini agent with callbacks
-        const { result, toolCallsLog, usage } = await agent.run(tweakPrompt, (message) => {
+        const lastUserMessage = history[history.length - 1].content;
+        const { result, toolCallsLog, usage } = await agent.run(lastUserMessage, (message) => {
           if (message.type === 'tool' && message.tool) {
             const toolMessage = toolMessages[message.tool] || 'Hämtar data...';
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({
@@ -95,7 +100,7 @@ export async function POST(req: NextRequest) {
         try {
           // Try to parse JSON response with edits
           const jsonMatch = result.match(/```json\s*([\s\S]*?)\s*```/) ||
-                           result.match(/\{[\s\S]*?"edits"[\s\S]*?\}/);
+            result.match(/\{[\s\S]*?"edits"[\s\S]*?\}/);
 
           if (jsonMatch) {
             const jsonStr = jsonMatch[1] || jsonMatch[0];
@@ -106,7 +111,29 @@ export async function POST(req: NextRequest) {
               updatedHTML = currentHTML;
               for (const edit of tweakData.edits) {
                 if (edit.old_string && edit.new_string) {
-                  updatedHTML = updatedHTML.replace(edit.old_string, edit.new_string);
+                  if (edit.target_id) {
+                    // ID-based targeting (Robust)
+                    const idRegex = new RegExp(`(<section[^>]*id="${edit.target_id}"[^>]*>)([\\s\\S]*?)(<\\/section>)`);
+                    const match = updatedHTML.match(idRegex);
+
+                    if (match) {
+                      const [fullMatch, openTag, content, closeTag] = match;
+                      // Replace only within this section
+                      if (content.includes(edit.old_string)) {
+                        const newContent = content.replace(edit.old_string, edit.new_string);
+                        updatedHTML = updatedHTML.replace(fullMatch, `${openTag}${newContent}${closeTag}`);
+                      } else {
+                        console.warn(`[Tweak] Target ID ${edit.target_id} found, but old_string not found in content.`);
+                        // Fallback: Try global replace if ID match failed (optional, maybe risky?)
+                        // updatedHTML = updatedHTML.replace(edit.old_string, edit.new_string);
+                      }
+                    } else {
+                      console.warn(`[Tweak] Target ID ${edit.target_id} not found.`);
+                    }
+                  } else {
+                    // Global replace (Legacy/Global style changes)
+                    updatedHTML = updatedHTML.replace(edit.old_string, edit.new_string);
+                  }
                 }
               }
 
@@ -158,7 +185,7 @@ export async function POST(req: NextRequest) {
             generatedAt: new Date().toISOString(),
             backend: 'gemini',
             type: 'tweak',
-            tweakPrompt,
+            history: history,
             originalTitle: currentTitle,
             model: model,
             toolCalls: toolCallsLog,
