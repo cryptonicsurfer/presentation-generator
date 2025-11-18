@@ -5,6 +5,8 @@ import { createDataAccessMcpServer } from '@/lib/mcp';
 import { generateSystemPrompt } from '@/lib/presentation/skills-loader';
 import { generateGeminiSystemPrompt } from '@/lib/presentation/gemini-skills-loader';
 import { generatePresentationHTML, generateTitleSlide, generateThankYouSlide } from '@/lib/presentation/template';
+import { calculateCost } from '@/lib/pricing';
+import { getDefaultModel } from '@/lib/config/models';
 import { writeFileSync } from 'fs';
 import { join } from 'path';
 import { createWorkspace, readHtml, saveMetadata } from '@/lib/workspace';
@@ -30,7 +32,7 @@ export async function POST(req: NextRequest) {
     async start(controller) {
       try {
         const body = await req.json();
-        const { prompt: userPrompt, backend = 'gemini' } = body;
+        const { prompt: userPrompt, model = getDefaultModel() } = body;
 
         if (!userPrompt) {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', message: 'Prompt is required' })}\n\n`));
@@ -38,17 +40,24 @@ export async function POST(req: NextRequest) {
           return;
         }
 
-        // Route to appropriate backend
-        if (backend === 'claude') {
-          await generateWithClaude(controller, encoder, userPrompt);
-        } else if (backend === 'gemini') {
-          await generateWithGemini(controller, encoder, userPrompt);
-        } else {
+        // Determine provider based on model ID
+        const provider = model.startsWith('claude-') ? 'claude' :
+                        model.startsWith('gemini-') ? 'gemini' : null;
+
+        if (!provider) {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({
             type: 'error',
-            message: `Unknown backend: ${backend}. Use 'claude' or 'gemini'`
+            message: `Unknown model: ${model}. Use a valid Claude or Gemini model ID.`
           })}\n\n`));
           controller.close();
+          return;
+        }
+
+        // Route to appropriate backend with specific model
+        if (provider === 'claude') {
+          await generateWithClaude(controller, encoder, userPrompt, model);
+        } else if (provider === 'gemini') {
+          await generateWithGemini(controller, encoder, userPrompt, model);
         }
       } catch (error) {
         console.error('Error generating presentation:', error);
@@ -71,12 +80,13 @@ export async function POST(req: NextRequest) {
 }
 
 /**
- * Generate presentation using Gemini 2.5 Flash
+ * Generate presentation using Gemini
  */
 async function generateWithGemini(
   controller: ReadableStreamDefaultController,
   encoder: TextEncoder,
-  userPrompt: string
+  userPrompt: string,
+  model: string
 ) {
   // Check for Google API key
   if (!process.env.GOOGLE_API_KEY) {
@@ -88,9 +98,12 @@ async function generateWithGemini(
     return;
   }
 
+  // Get model display name
+  const modelDisplayName = model.replace('gemini-', 'Gemini ').replace('-', ' ');
+
   controller.enqueue(encoder.encode(`data: ${JSON.stringify({
     type: 'status',
-    message: 'Initierar Gemini 2.5 Flash...'
+    message: `Initierar ${modelDisplayName}...`
   })}\n\n`));
 
   // Generate system prompt
@@ -101,24 +114,24 @@ async function generateWithGemini(
     message: 'Ansluter till Gemini med MCP tools...'
   })}\n\n`));
 
-  // Create Gemini agent
+  // Create Gemini agent with specified model
   const agent = new GeminiAgent({
     apiKey: process.env.GOOGLE_API_KEY,
-    model: 'gemini-2.5-flash',
+    model: model,
     systemInstruction: systemPrompt,
-    maxTurns: 50,
+    maxTurns: 25, // Balanced: enough for complex prompts, not too many to cause issues
   });
 
   // Tool name to user-friendly message mapping
   const toolMessages: Record<string, string> = {
     'query_fbg_analytics': 'Hämtar finansiell data från databas...',
     'search_directus_companies': 'Söker efter företag i CRM-systemet...',
-    'count_directus_meetings': 'Räknar antal möten med företaget...',
+    'analyze_meetings': 'Analyserar möten från CRM...',
     'get_directus_contacts': 'Hämtar kontaktpersoner från CRM...',
   };
 
   // Run Gemini agent with callbacks for progress updates
-  const { result, toolCallsLog } = await agent.run(userPrompt, (message) => {
+  const { result, toolCallsLog, usage } = await agent.run(userPrompt, (message) => {
     if (message.type === 'tool' && message.tool) {
       const toolMessage = toolMessages[message.tool] || `Kör verktyg: ${message.tool}`;
       controller.enqueue(encoder.encode(`data: ${JSON.stringify({
@@ -155,13 +168,33 @@ async function generateWithGemini(
   let sections: string[] = [];
 
   try {
-    // Try to parse JSON from Gemini's response (same as working gemini-agents branch)
-    const jsonMatch = result.match(/```json\s*([\s\S]*?)\s*```/) ||
-                     result.match(/\{[\s\S]*?"sections"[\s\S]*?\}/);
+    // Try to parse JSON from Gemini's response
+    // First try: Match ```json code blocks
+    let jsonMatch = result.match(/```json\s*([\s\S]*?)\s*```/);
+
+    if (!jsonMatch) {
+      // Second try: Find JSON object containing "sections"
+      jsonMatch = result.match(/\{[\s\S]*?"sections"[\s\S]*?\}/);
+    }
 
     if (jsonMatch) {
-      const jsonStr = jsonMatch[1] || jsonMatch[0];
-      presentationData = JSON.parse(jsonStr);
+      let jsonStr = jsonMatch[1] || jsonMatch[0];
+
+      // Try to parse - if it fails, we'll catch it below
+      try {
+        presentationData = JSON.parse(jsonStr);
+      } catch (parseError) {
+        // JSON parse failed - try cleaning approach as fallback
+        console.log('Initial JSON parse failed, trying to extract and fix...', parseError);
+
+        // Try to find just the object part more carefully
+        const objMatch = jsonStr.match(/(\{[\s\S]*\})/);
+        if (objMatch) {
+          presentationData = JSON.parse(objMatch[1]);
+        } else {
+          throw parseError; // Re-throw if we can't fix it
+        }
+      }
 
       presentationTitle = presentationData.title || userPrompt;
       sections = [
@@ -175,16 +208,21 @@ async function generateWithGemini(
         message: `Skapade ${presentationData.sections?.length || 0} slides från Gemini!`
       })}\n\n`));
     } else {
-      // Fallback: Create error slide
-      console.log('No JSON found in Gemini response:', result.substring(0, 500));
+      // No JSON pattern found
+      console.log('No JSON pattern found in Gemini response');
+      console.log('Response starts with:', result.substring(0, 200));
+
       sections = [
         generateTitleSlide(userPrompt),
         `<section class="slide bg-white items-center justify-center px-16">
-          <img src="/assets/Falkenbergskommun-logo_CMYK_POS_LIGG.png"
+          <img src="https://kommun.falkenberg.se/document/om-kommunen/grafisk-profil/kommunens-logotyper/liggande-logotyper-foer-tryck/1609-falkenbergskommun-logo-svart-ligg"
                alt="Falkenbergs kommun" class="slide-logo">
           <div class="max-w-6xl w-full">
-            <h2 class="text-5xl font-bold text-gray-900 mb-8">Gemini's Svar</h2>
-            <div class="text-lg text-gray-700 whitespace-pre-wrap">${result.substring(0, 1000)}</div>
+            <h2 class="text-5xl font-bold text-gray-900 mb-8">Ingen JSON hittades</h2>
+            <p class="text-lg text-gray-700 mb-4">Gemini returnerade inte förväntad JSON-format.</p>
+            <div class="text-sm text-gray-600 mt-4 p-4 bg-gray-50 rounded overflow-auto max-h-96">
+              <pre>${result.substring(0, 2000)}</pre>
+            </div>
           </div>
         </section>`,
         generateThankYouSlide(),
@@ -197,17 +235,22 @@ async function generateWithGemini(
     }
   } catch (error) {
     console.error('Error parsing Gemini presentation data:', error);
+    console.error('Error details:', (error as Error).message);
+    console.error('Error stack:', (error as Error).stack);
 
-    // Error fallback
+    // Error fallback with more details
     sections = [
       generateTitleSlide(userPrompt),
       `<section class="slide bg-white items-center justify-center px-16">
-        <img src="/assets/Falkenbergskommun-logo_CMYK_POS_LIGG.png"
+        <img src="https://kommun.falkenberg.se/document/om-kommunen/grafisk-profil/kommunens-logotyper/liggande-logotyper-foer-tryck/1609-falkenbergskommun-logo-svart-ligg"
              alt="Falkenbergs kommun" class="slide-logo">
         <div class="max-w-6xl w-full">
           <h2 class="text-5xl font-bold text-gray-900 mb-8">Fel vid parsning</h2>
-          <p class="text-lg text-gray-700">Gemini svarade, men formatet kunde inte tolkas.</p>
-          <pre class="text-sm text-gray-600 mt-4 overflow-auto">${result.substring(0, 500)}</pre>
+          <p class="text-lg text-gray-700 mb-4">Gemini svarade, men formatet kunde inte tolkas.</p>
+          <p class="text-sm text-red-600 mb-4">Fel: ${(error as Error).message}</p>
+          <div class="text-sm text-gray-600 mt-4 p-4 bg-gray-50 rounded overflow-auto max-h-96">
+            <pre>${result.substring(0, 1000)}</pre>
+          </div>
         </div>
       </section>`,
       generateThankYouSlide(),
@@ -235,7 +278,7 @@ async function generateWithGemini(
       generatedAt: new Date().toISOString(),
       backend: 'gemini',
       prompt: userPrompt,
-      model: 'gemini-2.5-flash',
+      model: model,
       toolCalls: toolCallsLog,
       summary: {
         totalToolCalls: toolCallsLog.filter(t => t.type === 'tool_use').length,
@@ -250,6 +293,9 @@ async function generateWithGemini(
     console.error('Failed to save Gemini tool calls log:', logError);
   }
 
+  // Calculate cost
+  const cost = usage ? calculateCost(model, usage.inputTokens, usage.outputTokens) : 0;
+
   // Send completion
   controller.enqueue(encoder.encode(`data: ${JSON.stringify({
     type: 'complete',
@@ -261,23 +307,37 @@ async function generateWithGemini(
       sections: presentationData?.sections || []
     },
     toolCallsLogUrl: `/logs/${logFileName}`,
-    backend: 'gemini'
+    backend: 'gemini',
+    model: model,
+    usage: usage ? {
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      totalTokens: usage.totalTokens,
+      cost: cost,
+    } : undefined,
   })}\n\n`));
 
   controller.close();
 }
 
 /**
- * Generate presentation using Claude Sonnet 4.5
+ * Generate presentation using Claude
  */
 async function generateWithClaude(
   controller: ReadableStreamDefaultController,
   encoder: TextEncoder,
-  userPrompt: string
+  userPrompt: string,
+  model: string
 ) {
+  // Get model display name
+  const modelDisplayName = model
+    .replace('claude-sonnet-4-5-20250929', 'Claude Sonnet 4.5')
+    .replace('claude-haiku-4-5-20251001', 'Claude Haiku 4.5')
+    .replace('claude-opus-4-20250514', 'Claude Opus 4');
+
   controller.enqueue(encoder.encode(`data: ${JSON.stringify({
     type: 'status',
-    message: 'Initierar Claude Sonnet 4.5...'
+    message: `Initierar ${modelDisplayName}...`
   })}\n\n`));
 
   // Create workspace for this generation session
@@ -300,7 +360,7 @@ async function generateWithClaude(
     message: 'Ansluter till databaser...'
   })}\n\n`));
 
-  // Run the query with Claude
+  // Run the query with Claude using specified model
   const queryInstance = query({
     prompt: userPrompt,
     options: {
@@ -309,13 +369,13 @@ async function generateWithClaude(
       mcpServers: {
         'fbg-data-access': mcpServer,
       },
-      model: 'claude-sonnet-4-5-20250929',
+      model: model,
       maxTurns: 50,
       allowedTools: [
         'Write',
         'mcp__fbg-data-access__query_fbg_analytics',
         'mcp__fbg-data-access__search_directus_companies',
-        'mcp__fbg-data-access__count_directus_meetings',
+        'mcp__fbg-data-access__analyze_meetings',  // Upgraded: was count_directus_meetings
         'mcp__fbg-data-access__get_directus_contacts',
       ],
       settingSources: [],
@@ -335,10 +395,21 @@ async function generateWithClaude(
   let messageCount = 0;
   let allMessages: any[] = [];
   let toolCallsLog: ToolCallLog[] = [];
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
 
   for await (const message of queryInstance) {
     messageCount++;
     allMessages.push(message);
+
+    // Capture token usage from result message
+    if (message.type === 'result' && 'usage' in message) {
+      const usage = (message as any).usage;
+      if (usage) {
+        totalInputTokens = usage.input_tokens || 0;
+        totalOutputTokens = usage.output_tokens || 0;
+      }
+    }
 
     // Detect tool usage
     if (message.type === 'assistant' && message.message) {
@@ -452,7 +523,7 @@ async function generateWithClaude(
             const sections = [
               generateTitleSlide(userPrompt),
               `<section class="slide bg-white items-center justify-center px-16">
-                <img src="/assets/Falkenbergskommun-logo_CMYK_POS_LIGG.png"
+                <img src="https://kommun.falkenberg.se/document/om-kommunen/grafisk-profil/kommunens-logotyper/liggande-logotyper-foer-tryck/1609-falkenbergskommun-logo-svart-ligg"
                      alt="Falkenbergs kommun" class="slide-logo">
                 <div class="max-w-6xl w-full">
                   <h2 class="text-5xl font-bold text-gray-900 mb-8">Fel: Ingen HTML skapad</h2>
@@ -468,7 +539,7 @@ async function generateWithClaude(
           const sections = [
             generateTitleSlide(userPrompt),
             `<section class="slide bg-white items-center justify-center px-16">
-              <img src="/assets/Falkenbergskommun-logo_CMYK_POS_LIGG.png"
+              <img src="https://kommun.falkenberg.se/document/om-kommunen/grafisk-profil/kommunens-logotyper/liggande-logotyper-foer-tryck/1609-falkenbergskommun-logo-svart-ligg"
                    alt="Falkenbergs kommun" class="slide-logo">
               <div class="max-w-6xl w-full">
                 <h2 class="text-5xl font-bold text-gray-900 mb-8">Fel vid skapande</h2>
@@ -501,7 +572,7 @@ async function generateWithClaude(
           generatedAt: new Date().toISOString(),
           backend: 'claude',
           prompt: userPrompt,
-          model: 'claude-sonnet-4-5-20250929',
+          model: model,
           toolCalls: toolCallsLog,
           summary: {
             totalToolCalls: toolCallsLog.filter(t => t.type === 'tool_use').length,
@@ -523,6 +594,11 @@ async function generateWithClaude(
         createdAt: new Date().toISOString(),
       });
 
+      // Calculate cost
+      const cost = totalInputTokens > 0 || totalOutputTokens > 0
+        ? calculateCost(model, totalInputTokens, totalOutputTokens)
+        : 0;
+
       // Send completion
       controller.enqueue(encoder.encode(`data: ${JSON.stringify({
         type: 'complete',
@@ -532,7 +608,14 @@ async function generateWithClaude(
         sessionId: workspace.sessionId,
         workspaceUrl: `/workspaces/${workspace.sessionId}`,
         toolCallsLogUrl: `/logs/${logFileName}`,
-        backend: 'claude'
+        backend: 'claude',
+        model: model,
+        usage: (totalInputTokens > 0 || totalOutputTokens > 0) ? {
+          inputTokens: totalInputTokens,
+          outputTokens: totalOutputTokens,
+          totalTokens: totalInputTokens + totalOutputTokens,
+          cost: cost,
+        } : undefined,
       })}\n\n`));
     }
   }

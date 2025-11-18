@@ -188,7 +188,7 @@ Use these Falkenberg-styled templates:
 ## Stats Grid (3 columns)
 \`\`\`html
 <section class="slide bg-white items-center justify-center px-16">
-    <img src="/assets/Falkenbergskommun-logo_CMYK_POS_LIGG.png"
+    <img src="https://kommun.falkenberg.se/document/om-kommunen/grafisk-profil/kommunens-logotyper/liggande-logotyper-foer-tryck/1609-falkenbergskommun-logo-svart-ligg"
          alt="Falkenbergs kommun" class="slide-logo">
     <div class="max-w-6xl w-full">
         <div class="flex items-center gap-4 mb-12">
@@ -210,7 +210,7 @@ Use these Falkenberg-styled templates:
 ## Trend Slide (Year-over-Year Comparison)
 \`\`\`html
 <section class="slide bg-white items-center justify-center px-16">
-    <img src="/assets/Falkenbergskommun-logo_CMYK_POS_LIGG.png" alt="Falkenbergs kommun" class="slide-logo">
+    <img src="https://kommun.falkenberg.se/document/om-kommunen/grafisk-profil/kommunens-logotyper/liggande-logotyper-foer-tryck/1609-falkenbergskommun-logo-svart-ligg" alt="Falkenbergs kommun" class="slide-logo">
     <div class="max-w-6xl w-full">
         <div class="flex items-center gap-4 mb-12">
             <i data-lucide="trending-up" class="w-12 h-12 text-falkenberg-kommunblå"></i>
@@ -235,7 +235,7 @@ Use these Falkenberg-styled templates:
 ## Comparison Table (Multi-Year)
 \`\`\`html
 <section class="slide bg-white items-center justify-center px-16">
-    <img src="/assets/Falkenbergskommun-logo_CMYK_POS_LIGG.png" alt="Falkenbergs kommun" class="slide-logo">
+    <img src="https://kommun.falkenberg.se/document/om-kommunen/grafisk-profil/kommunens-logotyper/liggande-logotyper-foer-tryck/1609-falkenbergskommun-logo-svart-ligg" alt="Falkenbergs kommun" class="slide-logo">
     <div class="max-w-6xl w-full">
         <h2 class="text-5xl font-bold text-gray-900 mb-12">Nyckeltal över tid</h2>
         <table class="w-full text-left">
@@ -282,8 +282,8 @@ Use these Falkenberg-styled templates:
   - havtorn (#f39200) - accent
   - vinbär (#ab0d1f) - warning
 - **Logos**:
-  - Light backgrounds: /assets/Falkenbergskommun-logo_CMYK_POS_LIGG.png
-  - Dark backgrounds: /assets/Falkenbergskommun-logo_VIT_LIGG.svg
+  - Light backgrounds: https://kommun.falkenberg.se/document/om-kommunen/grafisk-profil/kommunens-logotyper/liggande-logotyper-foer-tryck/1609-falkenbergskommun-logo-svart-ligg
+  - Dark backgrounds: https://kommun.falkenberg.se/document/om-kommunen/grafisk-profil/kommunens-logotyper/liggande-logotyper-foer-tryck/1610-falkenbergskommun-logo-vit-ligg
 - **Icons**: Use Lucide icons (data-lucide attribute)
 - **Missing data**: Show "Inga uppgifter tillgängliga"
 

@@ -7,7 +7,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Download, Eye, Sparkles, Maximize2, FileJson, Moon, Sun } from 'lucide-react';
+import { Loader2, Download, Eye, Maximize2, FileJson, Sparkles } from 'lucide-react';
+import type { ModelInfo } from '@/app/api/models/route';
+import { formatCost } from '@/lib/pricing';
 
 type StatusUpdate = {
   type: 'status' | 'tool' | 'thinking' | 'error' | 'complete';
@@ -16,9 +18,16 @@ type StatusUpdate = {
   title?: string;
   slideCount?: number;
   toolCallsLogUrl?: string;
+  model?: string;
   presentationData?: {
     title: string;
     sections: string[];
+  };
+  usage?: {
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    cost: number;
   };
 };
 
@@ -51,8 +60,8 @@ function ShimmerContainer({ active, radius = '1.5rem', className, children }: Sh
 
 export default function PresentationGenerator() {
   const [prompt, setPrompt] = useState('');
-  const [backend, setBackend] = useState<'claude' | 'gemini'>('gemini');
-  const [darkMode, setDarkMode] = useState(false);
+  const [availableModels, setAvailableModels] = useState<ModelInfo[]>([]);
+  const [selectedModel, setSelectedModel] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [statusUpdates, setStatusUpdates] = useState<StatusUpdate[]>([]);
   const [generatedHTML, setGeneratedHTML] = useState<string | null>(null);
@@ -61,6 +70,7 @@ export default function PresentationGenerator() {
   const [tweakPrompt, setTweakPrompt] = useState('');
   const [isTweaking, setIsTweaking] = useState(false);
   const [toolCallsLogUrl, setToolCallsLogUrl] = useState<string | null>(null);
+  const [usageData, setUsageData] = useState<{ inputTokens: number; outputTokens: number; totalTokens: number; cost: number } | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const examplePrompts = [
@@ -80,6 +90,26 @@ export default function PresentationGenerator() {
   const shouldHighlightPreview = isTweaking;
   const shouldHighlightTweakArea = isTweaking;
 
+  // Fetch available models on mount
+  useEffect(() => {
+    async function fetchModels() {
+      try {
+        const response = await fetch('/api/models');
+        if (!response.ok) throw new Error('Failed to fetch models');
+        const data = await response.json();
+        setAvailableModels(data.models);
+
+        // Set default model to first available model
+        if (data.models.length > 0) {
+          setSelectedModel(data.models[0].id);
+        }
+      } catch (error) {
+        console.error('Error fetching models:', error);
+      }
+    }
+    fetchModels();
+  }, []);
+
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
 
@@ -95,7 +125,7 @@ export default function PresentationGenerator() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ prompt, backend }),
+        body: JSON.stringify({ prompt, model: selectedModel }),
       });
 
       if (!response.ok) {
@@ -145,6 +175,10 @@ export default function PresentationGenerator() {
                   }
                   if (data.toolCallsLogUrl) {
                     setToolCallsLogUrl(data.toolCallsLogUrl);
+                  }
+                  // Capture usage data
+                  if (data.usage) {
+                    setUsageData(data.usage);
                   }
                 }
               }
@@ -199,15 +233,6 @@ export default function PresentationGenerator() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [generatedHTML]);
 
-  // Dark mode toggle
-  useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [darkMode]);
-
   const handleFullscreen = () => {
     if (!iframeRef.current) return;
 
@@ -238,7 +263,7 @@ export default function PresentationGenerator() {
         body: JSON.stringify({
           tweakPrompt,
           presentationData,
-          backend,
+          model: selectedModel,
         }),
       });
 
@@ -286,6 +311,10 @@ export default function PresentationGenerator() {
                     if (data.toolCallsLogUrl) {
                       setToolCallsLogUrl(data.toolCallsLogUrl);
                     }
+                    // Capture usage data
+                    if (data.usage) {
+                      setUsageData(data.usage);
+                    }
                   } catch (decodeError) {
                     console.error('Failed to decode Base64 HTML:', decodeError);
                   }
@@ -310,31 +339,8 @@ export default function PresentationGenerator() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 p-8">
+    <div className="min-h-screen p-8 transition-colors bg-gradient-to-br from-blue-50 via-white to-green-50 dark:from-slate-950 dark:via-[#050b18] dark:to-[#041022]">
       <div className="max-w-[1800px] mx-auto">
-        {/* Header */}
-        <div className="text-center mb-6">
-          <div className="flex items-center justify-center gap-3 mb-2 relative">
-            <Sparkles className="w-10 h-10 text-gray-600" />
-            <h1 className="text-5xl font-bold text-gray-900">Presentation Generator</h1>
-
-            {/* Dark Mode Toggle - Positioned absolutely to the right */}
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setDarkMode(!darkMode)}
-              className="absolute right-0"
-              title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-            >
-              {darkMode ? (
-                <Sun className="w-5 h-5" />
-              ) : (
-                <Moon className="w-5 h-5" />
-              )}
-            </Button>
-          </div>
-        </div>
-
         <div className="grid grid-cols-1 xl:grid-cols-5 gap-8">
           {/* Left Column: Input */}
           <div className="xl:col-span-2 space-y-6">
@@ -347,32 +353,28 @@ export default function PresentationGenerator() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Backend Selector */}
+                {/* Model Selector */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">
+                  <label className="text-sm font-medium text-foreground/80 dark:text-foreground">
                     AI-modell
                   </label>
                   <Select
-                    value={backend}
-                    onValueChange={(value) => setBackend(value as 'claude' | 'gemini')}
-                    disabled={isGenerating}
+                    value={selectedModel}
+                    onValueChange={setSelectedModel}
+                    disabled={isGenerating || availableModels.length === 0}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Välj AI-modell" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="gemini">
-                        <div className="flex flex-col items-start">
-                          <span className="font-medium">Gemini 2.5 Flash</span>
-                          <span className="text-xs text-gray-500">Snabbare, billigare</span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="claude">
-                        <div className="flex flex-col items-start">
-                          <span className="font-medium">Claude Sonnet 4.5</span>
-                          <span className="text-xs text-gray-500">Mer pålitlig, bättre resonemang</span>
-                        </div>
-                      </SelectItem>
+                      {availableModels.map((model) => (
+                        <SelectItem key={model.id} value={model.id}>
+                          <div className="flex flex-col items-start">
+                            <span className="font-medium">{model.name}</span>
+                            <span className="text-xs text-muted-foreground">{model.description}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -387,7 +389,7 @@ export default function PresentationGenerator() {
                 />
 
                 <div className="space-y-2">
-                  <p className="text-sm text-gray-600">Exempel på prompts:</p>
+                  <p className="text-sm text-muted-foreground">Exempel på prompts:</p>
                   <div className="flex flex-wrap gap-2">
                   {examplePrompts.map((example, i) => (
                     <Button
@@ -433,7 +435,7 @@ export default function PresentationGenerator() {
                 <CardHeader>
                   <CardTitle>Status</CardTitle>
                   <CardDescription>
-                    {backend === 'claude' ? 'Claude Sonnet 4.5' : 'Gemini 2.5 Flash'} arbetar med din presentation
+                    {availableModels.find(m => m.id === selectedModel)?.name || 'AI-modellen'} arbetar med din presentation
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -455,7 +457,7 @@ export default function PresentationGenerator() {
                         {update.type === 'error' && (
                           <Badge variant="destructive">Fel</Badge>
                         )}
-                        <p className="text-sm text-gray-700 flex-1">{update.message}</p>
+                        <p className="text-sm text-foreground/80 flex-1">{update.message}</p>
                       </div>
                     ))}
                   </div>
@@ -472,9 +474,18 @@ export default function PresentationGenerator() {
               <CardHeader>
                 <CardTitle>Förhandsvisning</CardTitle>
                 <CardDescription>
-                  {generatedHTML
-                    ? `${presentationTitle} (${statusUpdates.find((u) => u.type === 'complete')?.slideCount || 0} slides)`
-                    : 'Din presentation kommer att visas här'}
+                  {generatedHTML ? (
+                    <>
+                      <div>{presentationTitle} ({statusUpdates.find((u) => u.type === 'complete')?.slideCount || 0} slides)</div>
+                      {usageData && (
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {usageData.inputTokens.toLocaleString()} in · {usageData.outputTokens.toLocaleString()} out · {usageData.totalTokens.toLocaleString()} total · ${formatCost(usageData.cost)}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    'Din presentation kommer att visas här'
+                  )}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -512,7 +523,7 @@ export default function PresentationGenerator() {
                       </div>
                     )} */}
 
-                    <div className="w-full aspect-[16/9] border-2 border-gray-200 rounded-lg overflow-hidden bg-white shadow-2xl">
+                    <div className="w-full aspect-[16/9] border-2 border-border/40 dark:border-border/60 rounded-lg overflow-hidden bg-card shadow-2xl transition-colors">
                       <iframe
                         ref={iframeRef}
                         className="w-full h-full"
@@ -522,8 +533,8 @@ export default function PresentationGenerator() {
                     </div>
                   </>
                 ) : (
-                  <div className="flex items-center justify-center w-full aspect-[16/9] border-2 border-dashed border-gray-300 rounded-lg">
-                    <div className="text-center text-gray-500">
+                  <div className="flex items-center justify-center w-full aspect-[16/9] border-2 border-dashed border-border/40 dark:border-border/60 rounded-lg transition-colors">
+                    <div className="text-center text-muted-foreground">
                       <Sparkles className="w-16 h-16 mx-auto mb-4 opacity-50" />
                       <p className="text-lg">Väntar på generering...</p>
                     </div>
@@ -533,8 +544,8 @@ export default function PresentationGenerator() {
                 {/* Tweak Presentation - Always visible, disabled until presentation is ready */}
                 <div className="mt-6">
                   <ShimmerContainer active={shouldHighlightTweakArea} radius="1.25rem">
-                  <div className="pt-6 border-t border-gray-200">
-                  <h3 className={`text-lg font-semibold mb-2 ${!generatedHTML ? 'text-gray-400' : 'text-gray-900'}`}>
+                  <div className="pt-6 border-t border-border/40 dark:border-border/60">
+                  <h3 className={`text-lg font-semibold mb-2 ${!generatedHTML ? 'text-muted-foreground/70' : 'text-foreground'}`}>
                     Justera Presentation (efter generering är gjord)
                   </h3>
                   {/* <p className={`text-sm mb-4 ${!generatedHTML ? 'text-gray-400' : 'text-gray-600'}`}>

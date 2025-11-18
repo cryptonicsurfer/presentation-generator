@@ -2,6 +2,8 @@ import { NextRequest } from 'next/server';
 import { GeminiAgent } from '@/lib/agents/gemini-agent';
 import { generateGeminiTweakPrompt } from '@/lib/presentation/gemini-skills-loader';
 import { generatePresentationHTML, generateTitleSlide, generateThankYouSlide } from '@/lib/presentation/template';
+import { calculateCost } from '@/lib/pricing';
+import { getDefaultGeminiModel } from '@/lib/config/models';
 import { writeFileSync } from 'fs';
 import { join } from 'path';
 
@@ -51,9 +53,10 @@ export async function POST(req: NextRequest) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'status', message: 'Ansluter till Gemini...' })}\n\n`));
 
         // Create Gemini agent
+        const model = getDefaultGeminiModel();
         const agent = new GeminiAgent({
           apiKey: process.env.GOOGLE_API_KEY,
-          model: 'gemini-2.5-flash',
+          model: model,
           systemInstruction: systemPrompt,
           maxTurns: 15, // Allow more turns if database queries needed
         });
@@ -67,7 +70,7 @@ export async function POST(req: NextRequest) {
         };
 
         // Run Gemini agent with callbacks
-        const { result, toolCallsLog } = await agent.run(tweakPrompt, (message) => {
+        const { result, toolCallsLog, usage } = await agent.run(tweakPrompt, (message) => {
           if (message.type === 'tool' && message.tool) {
             const toolMessage = toolMessages[message.tool] || 'Hämtar data...';
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({
@@ -157,7 +160,7 @@ export async function POST(req: NextRequest) {
             type: 'tweak',
             tweakPrompt,
             originalTitle: currentTitle,
-            model: 'gemini-2.5-flash',
+            model: model,
             toolCalls: toolCallsLog,
             summary: {
               totalToolCalls: toolCallsLog.filter(t => t.type === 'tool_use').length,
@@ -175,6 +178,9 @@ export async function POST(req: NextRequest) {
         // Base64 encode HTML to safely send via SSE
         const htmlBase64 = Buffer.from(updatedHTML).toString('base64');
 
+        // Calculate cost
+        const cost = usage ? calculateCost(model, usage.inputTokens, usage.outputTokens) : 0;
+
         // Send completion
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({
           type: 'complete',
@@ -186,7 +192,14 @@ export async function POST(req: NextRequest) {
             sections: updatedSections
           },
           toolCallsLogUrl: `/logs/${logFileName}`,
-          backend: 'gemini'
+          backend: 'gemini',
+          model: model,
+          usage: usage ? {
+            inputTokens: usage.inputTokens,
+            outputTokens: usage.outputTokens,
+            totalTokens: usage.totalTokens,
+            cost: cost,
+          } : undefined,
         })}\n\n`));
 
         controller.close();

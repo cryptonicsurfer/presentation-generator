@@ -4,7 +4,7 @@ import {
 } from './postgres-tools';
 import {
   searchDirectusCompaniesTool,
-  countDirectusMeetingsTool,
+  analyzeDirectusMeetingsTool,
   getDirectusContactsTool,
 } from './directus-tools';
 
@@ -20,7 +20,7 @@ export function createDataAccessMcpServer() {
       queryFbgAnalyticsTool,
       // Directus CRM tools
       searchDirectusCompaniesTool,
-      countDirectusMeetingsTool,
+      analyzeDirectusMeetingsTool,  // Upgraded: was countDirectusMeetingsTool
       getDirectusContactsTool,
     ],
   });

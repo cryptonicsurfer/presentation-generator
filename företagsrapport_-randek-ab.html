@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Företagsrapport: Randek AB - Falkenberg Kommun</title>
+    <!-- Script tags removed from 0 sections to prevent conflicts -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;800&family=Lato:wght@300;400&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'falkenberg-marinblå': '#13153b',
+                        'falkenberg-kommunblå': '#1f4e99',
+                        'falkenberg-blåklint': '#607ebe',
+                        'falkenberg-cyan': '#009fe3',
+                        'falkenberg-himmelsblå': '#86cedf',
+                        'falkenberg-kvällsblå': '#133E4D',
+                        'falkenberg-havsvik': '#0f8c9d',
+                        'falkenberg-buteljgrön': '#146647',
+                        'falkenberg-ängsgrön': '#52ae32',
+                        'falkenberg-olivgrön': '#739600',
+                        'falkenberg-blåstång': '#77bfb3',
+                        'falkenberg-vinbär': '#ab0d1f',
+                        'falkenberg-höstblad': '#f06e4e',
+                        'falkenberg-magenta': '#e6007e',
+                        'falkenberg-pion': '#f4a9af',
+                        'falkenberg-havtorn': '#f39200',
+                        'falkenberg-gul': '#ffd000',
+                        'falkenberg-ingefära': '#ebe24e',
+                        'falkenberg-stål': '#3d405b',
+                        'falkenberg-syren': '#a899ff',
+                        'falkenberg-hasselnöt': '#995626',
+                        'falkenberg-lila': '#a03c78',
+                        'falkenberg-korall': '#f0827d',
+                        'falkenberg-mörkgrå': '#414042',
+                        'falkenberg-ljusgrå': '#e6e7e8',
+                    },
+                    fontFamily: {
+                        'montserrat': ['Montserrat', 'sans-serif'],
+                        'lato': ['Lato', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Lato', sans-serif;
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        .slide {
+            height: 100vh;
+            display: none;
+            scroll-snap-align: start;
+            position: relative;
+        }
+
+        .slide-logo {
+            position: absolute;
+            bottom: 2rem;
+            right: 2rem;
+            width: 180px;
+            height: auto;
+            z-index: 10;
+        }
+
+        .slide.active {
+            display: flex;
+        }
+
+        @page {
+            size: 1920px 1080px;
+            margin: 0;
+        }
+
+        @media print {
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color-adjust: exact !important;
+            }
+
+            html, body {
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 1920px !important;
+                height: auto !important;
+            }
+
+            #slides-container {
+                display: block !important;
+                width: 1920px !important;
+            }
+
+            .slide {
+                display: flex !important;
+                page-break-after: always !important;
+                page-break-inside: avoid !important;
+                break-after: page !important;
+                break-inside: avoid !important;
+                width: 1920px !important;
+                height: 1080px !important;
+                min-height: 1080px !important;
+                max-height: 1080px !important;
+                margin: 0 !important;
+                box-sizing: border-box !important;
+                position: relative !important;
+                overflow: hidden !important;
+            }
+
+            .slide:last-child {
+                page-break-after: avoid !important;
+            }
+
+            .navigation, .fixed, button {
+                display: none !important;
+            }
+
+            .shadow-xl, .shadow-lg, .shadow-md, .shadow {
+                box-shadow: none !important;
+            }
+
+            .shadow-xl {
+                border: 1px solid rgba(0, 0, 0, 0.1) !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Navigation Controls -->
+    <div class="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50 flex gap-4">
+        <button id="prev-btn" class="bg-white hover:bg-gray-100 text-gray-800 px-6 py-3 rounded-full shadow-lg flex items-center gap-2 transition-all">
+            <i data-lucide="chevron-left" class="w-6 h-6"></i>
+        </button>
+        <button id="next-btn" class="bg-white hover:bg-gray-100 text-gray-800 px-6 py-3 rounded-full shadow-lg flex items-center gap-2 transition-all">
+            <i data-lucide="chevron-right" class="w-6 h-6"></i>
+        </button>
+    </div>
+
+    <!-- Slide Counter -->
+    <div class="fixed top-8 right-8 z-50 bg-white px-4 py-2 rounded-full shadow-md text-sm font-medium text-gray-700">
+        <span id="current-slide">1</span> / <span id="total-slides">0</span>
+    </div>
+
+    <!-- Slides Container -->
+    <div id="slides-container">
+        <section class="slide bg-gradient-to-br from-falkenberg-kommunblå to-falkenberg-marinblå items-center justify-center">
+    <img src="/assets/Falkenbergskommun-logo_VIT_LIGG.svg"
+         alt="Falkenbergs kommun" class="slide-logo">
+    <div class="text-center text-white px-16">
+        <h1 class="text-7xl font-bold mb-6">Företagsrapport: Randek AB</h1>
+        
+        <p class="text-xl font-light opacity-80">15 november 2025</p>
+    </div>
+</section>
+<section class="slide bg-white items-center justify-center px-16">
+    <img src="/assets/Falkenbergskommun-logo_CMYK_POS_LIGG.png"
+         alt="Falkenbergs kommun" class="slide-logo">
+    <div class="max-w-6xl w-full">
+        <h2 class="text-5xl font-bold text-gray-900 mb-6">Företagsöversikt: Randek AB</h2>
+        <div class="text-lg text-gray-700 space-y-4">
+            <p><strong class="text-falkenberg-kommunblå">Organisationsnummer:</strong> 556399-7146</p>
+            <p><strong class="text-falkenberg-kommunblå">Bransch:</strong> Tillverkning och utvinning</p>
+            <p><strong class="text-falkenberg-kommunblå">Beskrivning:</strong> Randek AB är verksamt inom tillverkningsindustrin i Falkenberg.</p>
+            <p><strong class="text-falkenberg-kommunblå">Arbetsställen i Falkenberg:</strong> 1</p>
+        </div>
+    </div>
+</section>
+<section class="slide bg-white items-center justify-center px-16">
+    <img src="/assets/Falkenbergskommun-logo_CMYK_POS_LIGG.png"
+         alt="Falkenbergs kommun" class="slide-logo">
+    <div class="max-w-6xl w-full">
+        <div class="flex items-center gap-4 mb-12">
+            <i data-lucide="bar-chart" class="w-12 h-12 text-falkenberg-kommunblå"></i>
+            <h2 class="text-5xl font-bold text-gray-900">Finansiell Översikt (2024)</h2>
+        </div>
+        <div class="grid grid-cols-3 gap-8">
+            <div class="bg-white p-10 rounded-2xl shadow-xl text-center border-2 border-gray-100">
+                <i data-lucide="dollar-sign" class="w-16 h-16 mx-auto mb-6 text-falkenberg-kommunblå"></i>
+                <div class="text-6xl font-bold text-falkenberg-kommunblå mb-3">479,4 Mkr</div>
+                <p class="text-xl text-gray-600">Omsättning</p>
+            </div>
+            <div class="bg-white p-10 rounded-2xl shadow-xl text-center border-2 border-gray-100">
+                <i data-lucide="users" class="w-16 h-16 mx-auto mb-6 text-falkenberg-kommunblå"></i>
+                <div class="text-6xl font-bold text-falkenberg-kommunblå mb-3">72</div>
+                <p class="text-xl text-gray-600">Anställda</p>
+            </div>
+            <div class="bg-white p-10 rounded-2xl shadow-xl text-center border-2 border-gray-100">
+                <i data-lucide="trending-up" class="w-16 h-16 mx-auto mb-6 text-falkenberg-kommunblå"></i>
+                <div class="text-6xl font-bold text-falkenberg-kommunblå mb-3">38,6 Mkr</div>
+                <p class="text-xl text-gray-600">Resultat</p>
+            </div>
+            <div class="bg-white p-10 rounded-2xl shadow-xl text-center border-2 border-gray-100">
+                <i data-lucide="percent" class="w-16 h-16 mx-auto mb-6 text-falkenberg-kommunblå"></i>
+                <div class="text-6xl font-bold text-falkenberg-kommunblå mb-3">28,4%</div>
+                <p class="text-xl text-gray-600">Soliditet</p>
+            </div>
+            <div class="bg-white p-10 rounded-2xl shadow-xl text-center border-2 border-gray-100">
+                <i data-lucide="target" class="w-16 h-16 mx-auto mb-6 text-falkenberg-kommunblå"></i>
+                <div class="text-6xl font-bold text-falkenberg-kommunblå mb-3">8,1%</div>
+                <p class="text-xl text-gray-600">Rörelsemarginal</p>
+            </div>
+        </div>
+    </div>
+</section>
+<section class="slide bg-white items-center justify-center px-16">
+    <img src="/assets/Falkenbergskommun-logo_CMYK_POS_LIGG.png" alt="Falkenbergs kommun" class="slide-logo">
+    <div class="max-w-6xl w-full">
+        <div class="flex items-center gap-4 mb-12">
+            <i data-lucide="line-chart" class="w-12 h-12 text-falkenberg-kommunblå"></i>
+            <h2 class="text-5xl font-bold text-gray-900">Omsättningsutveckling (2020-2024)</h2>
+        </div>
+        <div class="grid grid-cols-5 gap-6">
+            <div class="bg-gradient-to-br from-gray-50 to-white p-6 rounded-xl border-2 border-gray-100 text-center">
+                <div class="text-sm text-gray-500 mb-2">2020</div>
+                <div class="text-3xl font-bold text-gray-900">409,9 Mkr</div>
+            </div>
+            <div class="bg-gradient-to-br from-gray-50 to-white p-6 rounded-xl border-2 border-gray-100 text-center">
+                <div class="text-sm text-gray-500 mb-2">2021</div>
+                <div class="text-3xl font-bold text-gray-900">159,4 Mkr</div>
+                <div class="text-sm text-falkenberg-vinbär mt-1">↓ -61,1%</div>
+            </div>
+            <div class="bg-gradient-to-br from-gray-50 to-white p-6 rounded-xl border-2 border-gray-100 text-center">
+                <div class="text-sm text-gray-500 mb-2">2022</div>
+                <div class="text-3xl font-bold text-gray-900">208,2 Mkr</div>
+                <div class="text-sm text-falkenberg-ängsgrön mt-1">↑ +30,6%</div>
+            </div>
+            <div class="bg-gradient-to-br from-gray-50 to-white p-6 rounded-xl border-2 border-gray-100 text-center">
+                <div class="text-sm text-gray-500 mb-2">2023</div>
+                <div class="text-3xl font-bold text-gray-900">249,4 Mkr</div>
+                <div class="text-sm text-falkenberg-ängsgrön mt-1">↑ +19,8%</div>
+            </div>
+            <div class="bg-gradient-to-br from-gray-50 to-white p-6 rounded-xl border-2 border-gray-100 text-center">
+                <div class="text-sm text-gray-500 mb-2">2024</div>
+                <div class="text-3xl font-bold text-gray-900">479,4 Mkr</div>
+                <div class="text-sm text-falkenberg-ängsgrön mt-1">↑ +92,3%</div>
+            </div>
+        </div>
+    </div>
+</section>
+<section class="slide bg-white items-center justify-center px-16">
+    <img src="/assets/Falkenbergskommun-logo_CMYK_POS_LIGG.png" alt="Falkenbergs kommun" class="slide-logo">
+    <div class="max-w-6xl w-full">
+        <div class="flex items-center gap-4 mb-12">
+            <i data-lucide="users" class="w-12 h-12 text-falkenberg-kommunblå"></i>
+            <h2 class="text-5xl font-bold text-gray-900">Anställda i Falkenberg (2020-2024)</h2>
+        </div>
+        <div class="grid grid-cols-5 gap-6">
+            <div class="bg-gradient-to-br from-gray-50 to-white p-6 rounded-xl border-2 border-gray-100 text-center">
+                <div class="text-sm text-gray-500 mb-2">2020</div>
+                <div class="text-3xl font-bold text-gray-900">54</div>
+            </div>
+            <div class="bg-gradient-to-br from-gray-50 to-white p-6 rounded-xl border-2 border-gray-100 text-center">
+                <div class="text-sm text-gray-500 mb-2">2021</div>
+                <div class="text-3xl font-bold text-gray-900">58</div>
+                <div class="text-sm text-falkenberg-ängsgrön mt-1">↑ +7,4%</div>
+            </div>
+            <div class="bg-gradient-to-br from-gray-50 to-white p-6 rounded-xl border-2 border-gray-100 text-center">
+                <div class="text-sm text-gray-500 mb-2">2022</div>
+                <div class="text-3xl font-bold text-gray-900">58</div>
+                <div class="text-sm text-gray-500 mt-1">+/- 0%</div>
+            </div>
+            <div class="bg-gradient-to-br from-gray-50 to-white p-6 rounded-xl border-2 border-gray-100 text-center">
+                <div class="text-sm text-gray-500 mb-2">2023</div>
+                <div class="text-3xl font-bold text-gray-900">66</div>
+                <div class="text-sm text-falkenberg-ängsgrön mt-1">↑ +13,8%</div>
+            </div>
+            <div class="bg-gradient-to-br from-gray-50 to-white p-6 rounded-xl border-2 border-gray-100 text-center">
+                <div class="text-sm text-gray-500 mb-2">2024</div>
+                <div class="text-3xl font-bold text-gray-900">72</div>
+                <div class="text-sm text-falkenberg-ängsgrön mt-1">↑ +9,1%</div>
+            </div>
+        </div>
+    </div>
+</section>
+<section class="slide bg-white items-center justify-center px-16">
+    <img src="/assets/Falkenbergskommun-logo_CMYK_POS_LIGG.png" alt="Falkenbergs kommun" class="slide-logo">
+    <div class="max-w-6xl w-full">
+        <div class="flex items-center gap-4 mb-12">
+            <i data-lucide="dollar-sign" class="w-12 h-12 text-falkenberg-kommunblå"></i>
+            <h2 class="text-5xl font-bold text-gray-900">Resultatutveckling (2020-2024)</h2>
+        </div>
+        <div class="grid grid-cols-5 gap-6">
+            <div class="bg-gradient-to-br from-gray-50 to-white p-6 rounded-xl border-2 border-gray-100 text-center">
+                <div class="text-sm text-gray-500 mb-2">2020</div>
+                <div class="text-3xl font-bold text-gray-900">17,3 Mkr</div>
+            </div>
+            <div class="bg-gradient-to-br from-gray-50 to-white p-6 rounded-xl border-2 border-gray-100 text-center">
+                <div class="text-sm text-gray-500 mb-2">2021</div>
+                <div class="text-3xl font-bold text-gray-900">10,7 Mkr</div>
+                <div class="text-sm text-falkenberg-vinbär mt-1">↓ -38,1%</div>
+            </div>
+            <div class="bg-gradient-to-br from-gray-50 to-white p-6 rounded-xl border-2 border-gray-100 text-center">
+                <div class="text-sm text-gray-500 mb-2">2022</div>
+                <div class="text-3xl font-bold text-gray-900">23,6 Mkr</div>
+                <div class="text-sm text-falkenberg-ängsgrön mt-1">↑ +119,6%</div>
+            </div>
+            <div class="bg-gradient-to-br from-gray-50 to-white p-6 rounded-xl border-2 border-gray-100 text-center">
+                <div class="text-sm text-gray-500 mb-2">2023</div>
+                <div class="text-3xl font-bold text-gray-900">20,7 Mkr</div>
+                <div class="text-sm text-falkenberg-vinbär mt-1">↓ -12,5%</div>
+            </div>
+            <div class="bg-gradient-to-br from-gray-50 to-white p-6 rounded-xl border-2 border-gray-100 text-center">
+                <div class="text-sm text-gray-500 mb-2">2024</div>
+                <div class="text-3xl font-bold text-gray-900">38,6 Mkr</div>
+                <div class="text-sm text-falkenberg-ängsgrön mt-1">↑ +86,0%</div>
+            </div>
+        </div>
+    </div>
+</section>
+<section class="slide bg-white items-center justify-center px-16">
+    <img src="/assets/Falkenbergskommun-logo_CMYK_POS_LIGG.png" alt="Falkenbergs kommun" class="slide-logo">
+    <div class="max-w-6xl w-full">
+        <h2 class="text-5xl font-bold text-gray-900 mb-12">Soliditet och Rörelsemarginal (2020-2024)</h2>
+        <table class="w-full text-left">
+            <thead>
+                <tr class="border-b-2 border-falkenberg-kommunblå">
+                    <th class="text-xl font-bold text-gray-900 pb-4">År</th>
+                    <th class="text-xl font-bold text-gray-900 pb-4 text-right">Soliditet (%)</th>
+                    <th class="text-xl font-bold text-gray-900 pb-4 text-right">Rörelsemarginal (%)</th>
+                </tr>
+            </thead>
+            <tbody class="text-lg">
+                <tr class="border-b border-gray-200">
+                    <td class="py-4 text-gray-700">2020</td>
+                    <td class="py-4 text-right font-semibold">38,6%</td>
+                    <td class="py-4 text-right font-semibold">4,2%</td>
+                </tr>
+                <tr class="border-b border-gray-200">
+                    <td class="py-4 text-gray-700">2021</td>
+                    <td class="py-4 text-right font-semibold">34,3% <span class="text-falkenberg-vinbär">↓</span></td>
+                    <td class="py-4 text-right font-semibold">8,5% <span class="text-falkenberg-ängsgrön">↑</span></td>
+                </tr>
+                <tr class="border-b border-gray-200">
+                    <td class="py-4 text-gray-700">2022</td>
+                    <td class="py-4 text-right font-semibold">30,1% <span class="text-falkenberg-vinbär">↓</span></td>
+                    <td class="py-4 text-right font-semibold">11,4% <span class="text-falkenberg-ängsgrön">↑</span></td>
+                </tr>
+                <tr class="border-b border-gray-200">
+                    <td class="py-4 text-gray-700">2023</td>
+                    <td class="py-4 text-right font-semibold">25,2% <span class="text-falkenberg-vinbär">↓</span></td>
+                    <td class="py-4 text-right font-semibold">8,3% <span class="text-falkenberg-vinbär">↓</span></td>
+                </tr>
+                <tr class="border-b border-gray-200">
+                    <td class="py-4 text-gray-700">2024</td>
+                    <td class="py-4 text-right font-semibold">28,4% <span class="text-falkenberg-ängsgrön">↑</span></td>
+                    <td class="py-4 text-right font-semibold">8,1% <span class="text-falkenberg-vinbär">↓</span></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+<section class="slide bg-white items-center justify-center px-16">
+    <img src="/assets/Falkenbergskommun-logo_CMYK_POS_LIGG.png" alt="Falkenbergs kommun" class="slide-logo">
+    <div class="max-w-6xl w-full">
+        <h2 class="text-5xl font-bold text-gray-900 mb-12">Nyckeltal över tid (2020-2024)</h2>
+        <table class="w-full text-left">
+            <thead>
+                <tr class="border-b-2 border-falkenberg-kommunblå">
+                    <th class="text-xl font-bold text-gray-900 pb-4">Metric</th>
+                    <th class="text-xl font-bold text-gray-900 pb-4 text-right">2020</th>
+                    <th class="text-xl font-bold text-gray-900 pb-4 text-right">2021</th>
+                    <th class="text-xl font-bold text-gray-900 pb-4 text-right">2022</th>
+                    <th class="text-xl font-bold text-gray-900 pb-4 text-right">2023</th>
+                    <th class="text-xl font-bold text-gray-900 pb-4 text-right">2024</th>
+                </tr>
+            </thead>
+            <tbody class="text-lg">
+                <tr class="border-b border-gray-200">
+                    <td class="py-4 text-gray-700">Omsättning (Mkr)</td>
+                    <td class="py-4 text-right font-semibold">409,9</td>
+                    <td class="py-4 text-right font-semibold">159,4</td>
+                    <td class="py-4 text-right font-semibold">208,2</td>
+                    <td class="py-4 text-right font-semibold">249,4</td>
+                    <td class="py-4 text-right font-semibold">479,4</td>
+                </tr>
+                <tr class="border-b border-gray-200">
+                    <td class="py-4 text-gray-700">Anställda</td>
+                    <td class="py-4 text-right font-semibold">54</td>
+                    <td class="py-4 text-right font-semibold">58</td>
+                    <td class="py-4 text-right font-semibold">58</td>
+                    <td class="py-4 text-right font-semibold">66</td>
+                    <td class="py-4 text-right font-semibold">72</td>
+                </tr>
+                <tr class="border-b border-gray-200">
+                    <td class="py-4 text-gray-700">Resultat (Mkr)</td>
+                    <td class="py-4 text-right font-semibold">17,3</td>
+                    <td class="py-4 text-right font-semibold">10,7</td>
+                    <td class="py-4 text-right font-semibold">23,6</td>
+                    <td class="py-4 text-right font-semibold">20,7</td>
+                    <td class="py-4 text-right font-semibold">38,6</td>
+                </tr>
+                <tr class="border-b border-gray-200">
+                    <td class="py-4 text-gray-700">Soliditet (%)</td>
+                    <td class="py-4 text-right font-semibold">38,6</td>
+                    <td class="py-4 text-right font-semibold">34,3</td>
+                    <td class="py-4 text-right font-semibold">30,1</td>
+                    <td class="py-4 text-right font-semibold">25,2</td>
+                    <td class="py-4 text-right font-semibold">28,4</td>
+                </tr>
+                <tr class="border-b border-gray-200">
+                    <td class="py-4 text-gray-700">Rörelsemarginal (%)</td>
+                    <td class="py-4 text-right font-semibold">4,2</td>
+                    <td class="py-4 text-right font-semibold">8,5</td>
+                    <td class="py-4 text-right font-semibold">11,4</td>
+                    <td class="py-4 text-right font-semibold">8,3</td>
+                    <td class="py-4 text-right font-semibold">8,1</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+<section class="slide bg-white items-center justify-center px-16">
+    <img src="/assets/Falkenbergskommun-logo_CMYK_POS_LIGG.png" alt="Falkenbergs kommun" class="slide-logo">
+    <div class="max-w-6xl w-full">
+        <div class="flex items-center gap-4 mb-12">
+            <i data-lucide="briefcase" class="w-12 h-12 text-falkenberg-kommunblå"></i>
+            <h2 class="text-5xl font-bold text-gray-900">Rekryteringsöversikt (Jobbannonser per år)</h2>
+        </div>
+        <div class="grid grid-cols-5 gap-6">
+            <div class="bg-gradient-to-br from-gray-50 to-white p-6 rounded-xl border-2 border-gray-100 text-center">
+                <div class="text-sm text-gray-500 mb-2">2021</div>
+                <div class="text-3xl font-bold text-gray-900">8</div>
+            </div>
+            <div class="bg-gradient-to-br from-gray-50 to-white p-6 rounded-xl border-2 border-gray-100 text-center">
+                <div class="text-sm text-gray-500 mb-2">2022</div>
+                <div class="text-3xl font-bold text-gray-900">13</div>
+            </div>
+            <div class="bg-gradient-to-br from-gray-50 to-white p-6 rounded-xl border-2 border-gray-100 text-center">
+                <div class="text-sm text-gray-500 mb-2">2023</div>
+                <div class="text-3xl font-bold text-gray-900">20</div>
+            </div>
+            <div class="bg-gradient-to-br from-gray-50 to-white p-6 rounded-xl border-2 border-gray-100 text-center">
+                <div class="text-sm text-gray-500 mb-2">2024</div>
+                <div class="text-3xl font-bold text-gray-900">15</div>
+            </div>
+            <div class="bg-gradient-to-br from-gray-50 to-white p-6 rounded-xl border-2 border-gray-100 text-center">
+                <div class="text-sm text-gray-500 mb-2">2025</div>
+                <div class="text-3xl font-bold text-gray-900">2</div>
+            </div>
+        </div>
+    </div>
+</section>
+<section class="slide bg-white items-center justify-center px-16">
+    <img src="/assets/Falkenbergskommun-logo_CMYK_POS_LIGG.png" alt="Falkenbergs kommun" class="slide-logo">
+    <div class="max-w-6xl w-full">
+        <div class="flex items-center gap-4 mb-12">
+            <i data-lucide="briefcase" class="w-12 h-12 text-falkenberg-kommunblå"></i>
+            <h2 class="text-5xl font-bold text-gray-900">Topp 10 Rekryterade Roller</h2>
+        </div>
+        <div class="grid grid-cols-2 gap-x-12 gap-y-6 text-lg">
+            <div class="flex items-center"><span class="font-bold text-falkenberg-kommunblå w-8">5x</span> Automationsingenjör med erfarenhet av Siemens TIA Portal</div>
+            <div class="flex items-center"><span class="font-bold text-falkenberg-kommunblå w-8">3x</span> Montageledare Randek AB Falkenberg</div>
+            <div class="flex items-center"><span class="font-bold text-falkenberg-kommunblå w-8">2x</span> PLC-Programmerare till växande Randek AB</div>
+            <div class="flex items-center"><span class="font-bold text-falkenberg-kommunblå w-8">2x</span> Konstruktör till Randek AB Falkenberg</div>
+            <div class="flex items-center"><span class="font-bold text-falkenberg-kommunblå w-8">2x</span> PLC-Programmerare</div>
+            <div class="flex items-center"><span class="font-bold text-falkenberg-kommunblå w-8">2x</span> Design Engineer</div>
+            <div class="flex items-center"><span class="font-bold text-falkenberg-kommunblå w-8">2x</span> Dokumentationsingenjör till Randek AB Falkenberg</div>
+            <div class="flex items-center"><span class="font-bold text-falkenberg-kommunblå w-8">2x</span> Konstruktionschef till en arbetsplats i världsklass</div>
+            <div class="flex items-center"><span class="font-bold text-falkenberg-kommunblå w-8">2x</span> Design Engineer till Randek Falkenberg</div>
+            <div class="flex items-center"><span class="font-bold text-falkenberg-kommunblå w-8">2x</span> Servicetekniker till Randek AB - Falkenberg</div>
+        </div>
+    </div>
+</section>
+<section class="slide bg-white items-center justify-center px-16">
+    <img src="/assets/Falkenbergskommun-logo_CMYK_POS_LIGG.png" alt="Falkenbergs kommun" class="slide-logo">
+    <div class="max-w-6xl w-full">
+        <div class="flex items-center gap-4 mb-12">
+            <i data-lucide="handshake" class="w-12 h-12 text-falkenberg-kommunblå"></i>
+            <h2 class="text-5xl font-bold text-gray-900">Engagemang med Business Falkenberg</h2>
+        </div>
+        <div class="grid grid-cols-2 gap-8">
+            <div class="bg-white p-10 rounded-2xl shadow-xl text-center border-2 border-gray-100">
+                <i data-lucide="calendar-check" class="w-16 h-16 mx-auto mb-6 text-falkenberg-kommunblå"></i>
+                <div class="text-xl text-gray-600 mb-3">Antal möten</div>
+                <div class="text-4xl font-bold text-falkenberg-kommunblå mb-3">2025: 1</div>
+                <div class="text-4xl font-bold text-falkenberg-kommunblå mb-3">2024: 1</div>
+                <div class="text-4xl font-bold text-falkenberg-kommunblå">2023: 1</div>
+            </div>
+            <div class="bg-white p-10 rounded-2xl shadow-xl text-center border-2 border-gray-100">
+                <i data-lucide="address-book" class="w-16 h-16 mx-auto mb-6 text-falkenberg-kommunblå"></i>
+                <div class="text-xl text-gray-600 mb-3">Nyckelkontakter</div>
+                <div class="text-3xl font-bold text-gray-900">Ola Lindh</div>
+                <p class="text-lg text-gray-600 mb-4">VD (Verkställande direktör)</p>
+                <div class="text-3xl font-bold text-gray-900">Darcie Smith</div>
+                <p class="text-lg text-gray-600">Project Manager</p>
+            </div>
+        </div>
+    </div>
+</section>
+<section class="slide bg-white items-center justify-center px-16">
+    <img src="/assets/Falkenbergskommun-logo_CMYK_POS_LIGG.png" alt="Falkenbergs kommun" class="slide-logo">
+    <div class="max-w-6xl w-full">
+        <div class="flex items-center gap-4 mb-12">
+            <i data-lucide="lightbulb" class="w-12 h-12 text-falkenberg-kommunblå"></i>
+            <h2 class="text-5xl font-bold text-gray-900">Insikter och Styrkor</h2>
+        </div>
+        <ul class="list-disc list-inside text-2xl text-gray-700 space-y-4">
+            <li><strong class="text-falkenberg-ängsgrön">Stark omsättningsökning:</strong> Randek AB har visat en mycket stark omsättningsökning på 92,3% mellan 2023 och 2024, vilket indikerar en period av betydande expansion och marknadsframgång.</li>
+            <li><strong class="text-falkenberg-ängsgrön">Stadig personalökning:</strong> Antalet anställda har ökat från 54 till 72 under perioden 2020-2024, vilket speglar företagets tillväxt och behov av att stärka arbetskraften lokalt i Falkenberg.</li>
+            <li><strong class="text-falkenberg-ängsgrön">Positiv resultatutveckling:</strong> Resultatet har återhämtat sig starkt under 2024 med en ökning på 86% efter en nedgång 2023, vilket tyder på effektiv verksamhetsstyrning och lönsamhet.</li>
+            <li><strong class="text-falkenberg-kommunblå">Aktiv rekryterare:</strong> Med 20 jobbannonser under 2023 och 15 under 2024 visar Randek AB en aktiv rekryteringsstrategi för att möta behov inom automation och konstruktion.</li>
+            <li><strong class="text-falkenberg-kommunblå">Nischad expertis:</strong> Företaget rekryterar specifika kompetenser som automationsingenjörer och PLC-programmerare, vilket indikerar en inriktning mot avancerad teknik och specialiserade lösningar.</li>
+        </ul>
+    </div>
+</section>
+<section class="slide bg-white items-center justify-center px-16">
+    <img src="/assets/Falkenbergskommun-logo_CMYK_POS_LIGG.png" alt="Falkenbergs kommun" class="slide-logo">
+    <div class="max-w-6xl w-full">
+        <div class="flex items-center gap-4 mb-12">
+            <i data-lucide="target" class="w-12 h-12 text-falkenberg-kommunblå"></i>
+            <h2 class="text-5xl font-bold text-gray-900">Möjligheter framåt</h2>
+        </div>
+        <ul class="list-disc list-inside text-2xl text-gray-700 space-y-4">
+            <li><strong class="text-falkenberg-havtorn">Fortsatt kompetensförsörjning:</strong> Med tanke på de specifika rekryteringsbehoven kan Business Falkenberg stödja Randek AB med matchning mot relevanta utbildningsprogram och talanger i regionen, särskilt inom automation och konstruktion.</li>
+            <li><strong class="text-falkenberg-havtorn">Nätverkande och samarbeten:</strong> Utforska möjligheter för Randek AB att samarbeta med andra lokala företag inom tillverkningsindustrin för att dela kunskap, resurser eller gemensamma projekt.</li>
+            <li><strong class="text-falkenberg-havtorn">Marknadsutvidgning:</strong> Med tanke på den starka omsättningstillväxten kan det finnas potential att utforska nya marknader eller produktområden, där Business Falkenberg kan erbjuda strategiskt stöd och kontakter.</li>
+            <li><strong class="text-falkenberg-havtorn">Hållbarhetsinitiativ:</strong> Undersöka hur Randek AB kan integrera fler hållbara metoder i sin tillverkning och verksamhet, vilket kan stärka företagets varumärke och attraktionskraft.</li>
+        </ul>
+    </div>
+</section>
+<section class="slide bg-white items-center justify-center px-16">
+    <img src="/assets/Falkenbergskommun-logo_CMYK_POS_LIGG.png" alt="Falkenbergs kommun" class="slide-logo">
+    <div class="max-w-6xl w-full">
+        <div class="flex items-center gap-4 mb-12">
+            <i data-lucide="clipboard-list" class="w-12 h-12 text-falkenberg-kommunblå"></i>
+            <h2 class="text-5xl font-bold text-gray-900">Sammanfattning</h2>
+        </div>
+        <ul class="list-disc list-inside text-2xl text-gray-700 space-y-4">
+            <li>Randek AB är ett framgångsrikt tillverkningsföretag i Falkenberg med en positiv utveckling av omsättning och antal anställda under de senaste åren, särskilt en markant ökning under 2024.</li>
+            <li>Företaget har visat en god förmåga att bibehålla lönsamhet och har en aktiv rekryteringsstrategi för att säkra specialiserad kompetens.</li>
+            <li>Relationen med Business Falkenberg är etablerad, med regelbundna möten under de senaste åren.</li>
+            <li>Framtida möjligheter inkluderar fortsatt stöd inom kompetensförsörjning, nätverkande och utforskande av hållbarhetsinitiativ.</li>
+        </ul>
+    </div>
+</section>
+<section class="slide bg-gradient-to-br from-falkenberg-ängsgrön to-falkenberg-havsvik items-center justify-center">
+    <img src="/assets/Falkenbergskommun-logo_VIT_LIGG.svg"
+         alt="Falkenbergs kommun" class="slide-logo">
+    <div class="text-center text-white px-16">
+        <h1 class="text-7xl font-bold mb-6">Tack!</h1>
+        <p class="text-3xl font-light">Frågor?</p>
+    </div>
+</section>
+    </div>
+
+    <script>
+      (function () {
+        let currentSlide = 0;
+        let slides = [];
+
+        function initSlides() {
+          slides = Array.from(document.querySelectorAll('.slide'));
+          const totalEl = document.getElementById('total-slides');
+          if (totalEl) totalEl.textContent = String(slides.length);
+
+          if (slides.length > 0) {
+            showSlide(0);
+          }
+        }
+
+        function showSlide(n) {
+          if (!slides || slides.length === 0) return;
+
+          slides.forEach(slide => slide.classList.remove('active'));
+
+          if (n >= slides.length) n = 0;
+          if (n < 0) n = slides.length - 1;
+
+          currentSlide = n;
+          slides[currentSlide].classList.add('active');
+
+          const currentEl = document.getElementById('current-slide');
+          if (currentEl) currentEl.textContent = String(currentSlide + 1);
+
+          if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            window.lucide.createIcons();
+          }
+        }
+
+        function nextSlide() {
+          showSlide(currentSlide + 1);
+        }
+
+        function prevSlide() {
+          showSlide(currentSlide - 1);
+        }
+
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'ArrowRight' || e.key === ' ') {
+            e.preventDefault();
+            nextSlide();
+          } else if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            prevSlide();
+          }
+        });
+
+        window.addEventListener('DOMContentLoaded', () => {
+          const nextBtn = document.getElementById('next-btn');
+          const prevBtn = document.getElementById('prev-btn');
+
+          nextBtn?.addEventListener('click', nextSlide);
+          prevBtn?.addEventListener('click', prevSlide);
+
+          initSlides();
+        });
+      })();
+    </script>
+</body>
+</html>

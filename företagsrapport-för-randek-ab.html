@@ -1,33 +1,10 @@
-/**
- * Generate the base HTML template for presentations
- */
-export function generatePresentationHTML(title: string, sections: string[]): string {
-  // AGGRESSIVELY remove ALL <script> tags from Claude-generated sections
-  let totalScriptsRemoved = 0;
-  const cleanedSections = sections.map((section, index) => {
-    const before = section.length;
-
-    let cleaned = section;
-    cleaned = cleaned.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-    cleaned = cleaned.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
-    cleaned = cleaned.replace(/<script[\s\S]*?<\/script>/gi, '');
-
-    const after = cleaned.length;
-    if (before !== after) {
-      totalScriptsRemoved++;
-      console.log(`[Template] Section ${index}: Removed ${before - after} chars of <script> tags`);
-    }
-
-    return cleaned;
-  });
-
-  return `<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="sv">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${title} - Falkenberg Kommun</title>
-    <!-- Script tags removed from ${totalScriptsRemoved} sections to prevent conflicts -->
+    <title>Företagsrapport för Randek AB - Falkenberg Kommun</title>
+    <!-- Script tags removed from 0 sections to prevent conflicts -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -177,7 +154,84 @@ export function generatePresentationHTML(title: string, sections: string[]): str
 
     <!-- Slides Container -->
     <div id="slides-container">
-        ${cleanedSections.join('\n')}
+        <section class="slide bg-gradient-to-br from-falkenberg-kommunblå to-falkenberg-marinblå items-center justify-center">
+    <img src="/assets/Falkenbergskommun-logo_VIT_LIGG.svg"
+         alt="Falkenbergs kommun" class="slide-logo">
+    <div class="text-center text-white px-16">
+        <h1 class="text-7xl font-bold mb-6">Företagsrapport för Randek AB</h1>
+        
+        <p class="text-xl font-light opacity-80">14 november 2025</p>
+    </div>
+</section>
+<section class="slide bg-white items-center justify-center px-16">
+    <img src="/assets/Falkenbergskommun-logo_CMYK_POS_LIGG.png"
+         alt="Falkenbergs kommun" class="slide-logo">
+    <div class="max-w-6xl w-full">
+        <h2 class="text-5xl font-bold text-gray-900 mb-12">Randek AB - Företagsöversikt</h2>
+        <div class="grid grid-cols-2 gap-8">
+            <div>
+                <h3 class="text-2xl font-bold text-falkenberg-kommunblå mb-4">Beskrivning</h3>
+                <p class="text-lg text-gray-700">Information om företaget kommer här...</p>
+            </div>
+            <div>
+                <h3 class="text-2xl font-bold text-falkenberg-kommunblå mb-4">Kontakt</h3>
+                <p class="text-lg text-gray-700">Kontaktinformation kommer här...</p>
+            </div>
+        </div>
+    </div>
+</section>
+<section class="slide bg-white items-center justify-center px-16">
+    <img src="/assets/Falkenbergskommun-logo_CMYK_POS_LIGG.png"
+         alt="Falkenbergs kommun" class="slide-logo">
+    <div class="max-w-6xl w-full">
+        <div class="flex items-center gap-4 mb-12">
+            <i data-lucide="bar-chart" class="w-12 h-12 text-falkenberg-kommunblå"></i>
+            <h2 class="text-5xl font-bold text-gray-900">Ekonomisk Data</h2>
+        </div>
+        <div class="grid grid-cols-3 gap-8">
+            <div class="bg-white p-10 rounded-2xl shadow-xl text-center border-2 border-gray-100">
+                <i data-lucide="users" class="w-16 h-16 mx-auto mb-6 text-falkenberg-kommunblå"></i>
+                <div class="text-6xl font-bold text-falkenberg-kommunblå mb-3">Inga uppgifter tillgängliga</div>
+                <p class="text-xl text-gray-600">Anställda</p>
+            </div>
+            <div class="bg-white p-10 rounded-2xl shadow-xl text-center border-2 border-gray-100">
+                <i data-lucide="currency" class="w-16 h-16 mx-auto mb-6 text-falkenberg-kommunblå"></i>
+                <div class="text-6xl font-bold text-falkenberg-kommunblå mb-3">Inga uppgifter tillgängliga</div>
+                <p class="text-xl text-gray-600">Omsättning (tkr)</p>
+            </div>
+            <div class="bg-white p-10 rounded-2xl shadow-xl text-center border-2 border-gray-100">
+                <i data-lucide="activity" class="w-16 h-16 mx-auto mb-6 text-falkenberg-kommunblå"></i>
+                <div class="text-6xl font-bold text-falkenberg-kommunblå mb-3">Inga uppgifter tillgängliga</div>
+                <p class="text-xl text-gray-600">Resultat (tkr)</p>
+            </div>
+        </div>
+    </div>
+</section>
+<section class="slide bg-white items-center justify-center px-16">
+    <img src="/assets/Falkenbergskommun-logo_CMYK_POS_LIGG.png"
+         alt="Falkenbergs kommun" class="slide-logo">
+    <div class="max-w-6xl w-full">
+        <div class="flex items-center gap-4 mb-12">
+            <i data-lucide="handshake" class="w-12 h-12 text-falkenberg-kommunblå"></i>
+            <h2 class="text-5xl font-bold text-gray-900">Interaktioner</h2>
+        </div>
+        <div class="grid grid-cols-1 gap-8">
+            <div class="bg-white p-10 rounded-2xl shadow-xl text-center border-2 border-gray-100">
+                <i data-lucide="calendar" class="w-16 h-16 mx-auto mb-6 text-falkenberg-kommunblå"></i>
+                <div class="text-6xl font-bold text-falkenberg-kommunblå mb-3">Inga uppgifter tillgängliga</div>
+                <p class="text-xl text-gray-600">Möten detta år</p>
+            </div>
+        </div>
+    </div>
+</section>
+<section class="slide bg-gradient-to-br from-falkenberg-ängsgrön to-falkenberg-havsvik items-center justify-center">
+    <img src="/assets/Falkenbergskommun-logo_VIT_LIGG.svg"
+         alt="Falkenbergs kommun" class="slide-logo">
+    <div class="text-center text-white px-16">
+        <h1 class="text-7xl font-bold mb-6">Tack!</h1>
+        <p class="text-3xl font-light">Frågor?</p>
+    </div>
+</section>
     </div>
 
     <script>
@@ -244,36 +298,4 @@ export function generatePresentationHTML(title: string, sections: string[]): str
       })();
     </script>
 </body>
-</html>`;
-}
-
-/**
- * Generate a title slide
- */
-export function generateTitleSlide(title: string, subtitle?: string, date?: string): string {
-  const displayDate = date || new Date().toLocaleDateString('sv-SE', { year: 'numeric', month: 'long', day: 'numeric' });
-
-  return `<section class="slide bg-gradient-to-br from-falkenberg-kommunblå to-falkenberg-marinblå items-center justify-center">
-    <img src="https://kommun.falkenberg.se/document/om-kommunen/grafisk-profil/kommunens-logotyper/liggande-logotyper-foer-tryck/1610-falkenbergskommun-logo-vit-ligg"
-         alt="Falkenbergs kommun" class="slide-logo">
-    <div class="text-center text-white px-16">
-        <h1 class="text-7xl font-bold mb-6">${title}</h1>
-        ${subtitle ? `<p class="text-3xl font-light mb-8">${subtitle}</p>` : ''}
-        <p class="text-xl font-light opacity-80">${displayDate}</p>
-    </div>
-</section>`;
-}
-
-/**
- * Generate a thank you slide
- */
-export function generateThankYouSlide(): string {
-  return `<section class="slide bg-gradient-to-br from-falkenberg-ängsgrön to-falkenberg-havsvik items-center justify-center">
-    <img src="https://kommun.falkenberg.se/document/om-kommunen/grafisk-profil/kommunens-logotyper/liggande-logotyper-foer-tryck/1610-falkenbergskommun-logo-vit-ligg"
-         alt="Falkenbergs kommun" class="slide-logo">
-    <div class="text-center text-white px-16">
-        <h1 class="text-7xl font-bold mb-6">Tack!</h1>
-        <p class="text-3xl font-light">Frågor?</p>
-    </div>
-</section>`;
-}
+</html>

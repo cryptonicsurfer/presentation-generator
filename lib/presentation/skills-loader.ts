@@ -222,7 +222,7 @@ Use these templates for different slide types:
 ## Stats Grid (3 columns)
 \`\`\`html
 <section class="slide bg-white items-center justify-center px-16">
-    <img src="/assets/Falkenbergskommun-logo_CMYK_POS_LIGG.png"
+    <img src="https://kommun.falkenberg.se/document/om-kommunen/grafisk-profil/kommunens-logotyper/liggande-logotyper-foer-tryck/1609-falkenbergskommun-logo-svart-ligg"
          alt="Falkenbergs kommun" class="slide-logo">
     <div class="max-w-6xl w-full">
         <div class="flex items-center gap-4 mb-12">
@@ -244,7 +244,7 @@ Use these templates for different slide types:
 ## Company Overview
 \`\`\`html
 <section class="slide bg-white items-center justify-center px-16">
-    <img src="/assets/Falkenbergskommun-logo_CMYK_POS_LIGG.png"
+    <img src="https://kommun.falkenberg.se/document/om-kommunen/grafisk-profil/kommunens-logotyper/liggande-logotyper-foer-tryck/1609-falkenbergskommun-logo-svart-ligg"
          alt="Falkenbergs kommun" class="slide-logo">
     <div class="max-w-6xl w-full">
         <h2 class="text-5xl font-bold text-gray-900 mb-12">Company Name</h2>
