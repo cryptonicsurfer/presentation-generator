@@ -293,13 +293,16 @@ async function generateWithGemini(
     console.error('Failed to save Gemini tool calls log:', logError);
   }
 
+  // Base64 encode HTML to safely send via SSE
+  const htmlBase64 = Buffer.from(presentationHTML).toString('base64');
+
   // Calculate cost
   const cost = usage ? calculateCost(model, usage.inputTokens, usage.outputTokens) : 0;
 
   // Send completion
   controller.enqueue(encoder.encode(`data: ${JSON.stringify({
     type: 'complete',
-    html: presentationHTML,
+    htmlBase64,
     title: presentationTitle,
     slideCount: sections.length,
     presentationData: {
@@ -594,6 +597,9 @@ async function generateWithClaude(
         createdAt: new Date().toISOString(),
       });
 
+      // Base64 encode HTML to safely send via SSE
+      const htmlBase64 = Buffer.from(presentationHTML).toString('base64');
+
       // Calculate cost
       const cost = totalInputTokens > 0 || totalOutputTokens > 0
         ? calculateCost(model, totalInputTokens, totalOutputTokens)
@@ -602,7 +608,7 @@ async function generateWithClaude(
       // Send completion
       controller.enqueue(encoder.encode(`data: ${JSON.stringify({
         type: 'complete',
-        html: presentationHTML,
+        htmlBase64,
         title: presentationTitle,
         slideCount,
         sessionId: workspace.sessionId,

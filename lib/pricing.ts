@@ -28,6 +28,10 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     inputPer1M: 1.25,
     outputPer1M: 10.00,
   },
+  'gemini-3-pro-preview': {
+    inputPer1M: 1.25, // Same as 2.5 Pro for now (update when official pricing announced)
+    outputPer1M: 10.00,
+  },
   // Legacy naming (deprecated)
   'gemini-flash-latest': {
     inputPer1M: 0.30,

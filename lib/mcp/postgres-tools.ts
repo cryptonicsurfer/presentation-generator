@@ -16,6 +16,18 @@ function getFbgAnalyticsPool(): Pool {
 }
 
 /**
+ * Normalize org_nummer in SQL queries
+ * Removes hyphens from organization numbers (556677-8899 → 5566778899)
+ * PostgreSQL stores without hyphens, Directus uses hyphens
+ */
+function normalizeOrgNummerInQuery(query: string): string {
+  return query.replace(
+    /(org_nummer\s*=\s*['"])(\d{6})-?(\d{4})(['"])/gi,
+    (match, prefix, part1, part2, suffix) => `${prefix}${part1}${part2}${suffix}`
+  );
+}
+
+/**
  * Query FBG Analytics database (company_financials, job_postings, etc.)
  */
 export const queryFbgAnalyticsTool = tool(
@@ -28,7 +40,9 @@ export const queryFbgAnalyticsTool = tool(
   async (args) => {
     try {
       const pool = getFbgAnalyticsPool();
-      const result = await pool.query(args.query, args.params);
+      // Normalize org_nummer format before executing
+      const normalizedQuery = normalizeOrgNummerInQuery(args.query);
+      const result = await pool.query(normalizedQuery, args.params);
 
       return {
         content: [{

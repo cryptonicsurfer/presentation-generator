@@ -1,3 +1,5 @@
+import { injectLogos } from './logos';
+
 /**
  * Generate the base HTML template for presentations
  */
@@ -32,7 +34,7 @@ export function generatePresentationHTML(title: string, sections: string[]): str
     return cleaned;
   });
 
-  return `<!DOCTYPE html>
+  const html = `<!DOCTYPE html>
 <html lang="sv">
 <head>
     <meta charset="UTF-8">
@@ -256,6 +258,9 @@ export function generatePresentationHTML(title: string, sections: string[]): str
     </script>
 </body>
 </html>`;
+
+  // Inject base64 logos AFTER generation to keep prompts token-efficient
+  return injectLogos(html);
 }
 
 /**
@@ -265,7 +270,7 @@ export function generateTitleSlide(title: string, subtitle?: string, date?: stri
   const displayDate = date || new Date().toLocaleDateString('sv-SE', { year: 'numeric', month: 'long', day: 'numeric' });
 
   return `<section id="slide-title" class="slide bg-gradient-to-br from-falkenberg-kommunblå to-falkenberg-marinblå items-center justify-center">
-    <img src="https://kommun.falkenberg.se/document/om-kommunen/grafisk-profil/kommunens-logotyper/liggande-logotyper-foer-tryck/1610-falkenbergskommun-logo-vit-ligg"
+    <img src="{{LOGO_VIT}}"
          alt="Falkenbergs kommun" class="slide-logo">
     <div class="text-center text-white px-16">
         <h1 class="text-7xl font-bold mb-6">${title}</h1>
@@ -280,7 +285,7 @@ export function generateTitleSlide(title: string, subtitle?: string, date?: stri
  */
 export function generateThankYouSlide(): string {
   return `<section id="slide-thankyou" class="slide bg-gradient-to-br from-falkenberg-ängsgrön to-falkenberg-havsvik items-center justify-center">
-    <img src="https://kommun.falkenberg.se/document/om-kommunen/grafisk-profil/kommunens-logotyper/liggande-logotyper-foer-tryck/1610-falkenbergskommun-logo-vit-ligg"
+    <img src="{{LOGO_VIT}}"
          alt="Falkenbergs kommun" class="slide-logo">
     <div class="text-center text-white px-16">
         <h1 class="text-7xl font-bold mb-6">Tack!</h1>

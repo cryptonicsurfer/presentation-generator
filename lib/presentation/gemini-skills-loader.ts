@@ -188,7 +188,7 @@ Use these Falkenberg-styled templates:
 ## Stats Grid (3 columns)
 \`\`\`html
 <section class="slide bg-white items-center justify-center px-16">
-    <img src="https://kommun.falkenberg.se/document/om-kommunen/grafisk-profil/kommunens-logotyper/liggande-logotyper-foer-tryck/1609-falkenbergskommun-logo-svart-ligg"
+    <img src="{{LOGO_SVART}}"
          alt="Falkenbergs kommun" class="slide-logo">
     <div class="max-w-6xl w-full">
         <div class="flex items-center gap-4 mb-12">
@@ -281,9 +281,10 @@ Use these Falkenberg-styled templates:
   - ängsgrön (#52ae32) - success
   - havtorn (#f39200) - accent
   - vinbär (#ab0d1f) - warning
-- **Logos**:
-  - Light backgrounds: https://kommun.falkenberg.se/document/om-kommunen/grafisk-profil/kommunens-logotyper/liggande-logotyper-foer-tryck/1609-falkenbergskommun-logo-svart-ligg
-  - Dark backgrounds: https://kommun.falkenberg.se/document/om-kommunen/grafisk-profil/kommunens-logotyper/liggande-logotyper-foer-tryck/1610-falkenbergskommun-logo-vit-ligg
+- **Logos** (IMPORTANT: Use these EXACT placeholders - they're replaced with images automatically):
+  - Light backgrounds: {{LOGO_SVART}}
+  - Dark backgrounds: {{LOGO_VIT}}
+  - Always include in <img> tag: <img src="{{LOGO_SVART}}" alt="Falkenbergs kommun" class="slide-logo">
 - **Icons**: Use Lucide icons (data-lucide attribute)
 - **Missing data**: Show "Inga uppgifter tillgängliga"
 
@@ -328,10 +329,7 @@ BE THOROUGH! Use multiple queries, analyze trends, and create a comprehensive 10
 }
 
 /**
- * Generate system prompt for Gemini tweak operations (diff-edits)
- */
-/**
- * Generate system prompt for Gemini tweak operations (diff-edits)
+ * Generate system prompt for Gemini tweak operations (diff-edits and adding slides)
  */
 export async function generateGeminiTweakPrompt(
   history: { role: string; content: string }[],
@@ -359,33 +357,77 @@ ${currentHTML}
 
 # Your Task
 Analyze the request and the history. Determine what needs to change.
-You can either:
-1. **Update specific slides by ID** (Preferred & Most Robust)
-2. **Global Search & Replace** (Use only for global style changes)
+You can:
+1. **Update specific slides by ID** (for editing existing content)
+2. **Add new slides** (insert new sections before thank you slide)
+3. **Delete slides** (remove specific sections)
+4. **Global Search & Replace** (for global style changes)
+
+# Available Tools
+You have access to these database tools if you need to fetch new data:
+- query_fbg_analytics
+- search_directus_companies
+- count_directus_meetings
+- get_directus_contacts
 
 # Output Format
-Return a JSON object with this structure:
 
+## Option A: Simple Edits (for updates/deletions)
 \`\`\`json
 {
   "edits": [
     {
-      "target_id": "slide-1", // OPTIONAL: If specified, 'old_string' is searched ONLY within this element.
+      "target_id": "slide-1", // OPTIONAL: If specified, search ONLY within this element
       "old_string": "exact text to find",
-      "new_string": "replacement text"
+      "new_string": "replacement text" // Empty string "" to delete
     }
   ],
-  "changesSummary": "Brief description in Swedish of what was changed"
+  "changesSummary": "Brief description in Swedish"
+}
+\`\`\`
+
+## Option B: Adding New Slides (for insertions)
+\`\`\`json
+{
+  "newSlides": [
+    "<section class=\\"slide\\" id=\\"slide-X\\">...complete slide HTML...</section>",
+    "<section class=\\"slide\\" id=\\"slide-Y\\">...complete slide HTML...</section>"
+  ],
+  "changesSummary": "Brief description in Swedish"
 }
 \`\`\`
 
 # Rules
-1. **ID Targeting**: If the user asks to change "slide 2" or "the financial slide", look at the HTML to find the correct ID (e.g., id="slide-1") and use "target_id": "slide-1".
-2. **Precision**: 'old_string' must match EXACTLY.
-3. **Context**: If the user says "make *it* blue", refer to the history to know what "*it*" is.
-4. **Tools**: You can use tools (query_fbg_analytics, etc.) to fetch new data if requested.
+1. **ID Targeting**: Slides are numbered sequentially: slide-0, slide-1, slide-2, etc.
+   - slide-title = title slide (first)
+   - slide-0, slide-1, slide-2... = content slides
+   - slide-thankyou = thank you slide (last)
+2. **Adding Slides**: If user asks to "add" or "insert" slides, use "newSlides" array with complete HTML
+3. **Editing Slides**: If user asks to "change" or "update", use "edits" array with old_string/new_string
+4. **Precision**: 'old_string' must match EXACTLY (including whitespace)
+5. **Tools**: Use database tools to fetch fresh data if needed
+6. **Slide IDs**: When adding new slides, assign sequential IDs (e.g., if last slide is slide-12, new ones are slide-13, slide-14)
 
-# Example
+# Slide Template for New Slides
+When adding new slides, follow this structure:
+
+\`\`\`html
+<section class="slide bg-white items-center justify-center px-16" id="slide-X">
+    <img src="{{LOGO_SVART}}"
+         alt="Falkenbergs kommun" class="slide-logo">
+    <div class="max-w-6xl w-full">
+        <div class="flex items-center gap-4 mb-12">
+            <i data-lucide="bar-chart" class="w-12 h-12 text-falkenberg-kommunblå"></i>
+            <h2 class="text-5xl font-bold text-gray-900">Slide Title</h2>
+        </div>
+        <!-- Your content here -->
+    </div>
+</section>
+\`\`\`
+
+# Examples
+
+## Example 1: Editing Existing Slide
 User: "Change the title on slide 2 to 'Growth'"
 HTML has: <section id="slide-1">...<h2>Old Title</h2>...</section>
 
@@ -403,6 +445,20 @@ Response:
 }
 \`\`\`
 
+## Example 2: Adding New Slides
+User: "Add a slide with revenue chart"
+(After fetching data with query_fbg_analytics)
+
+Response:
+\`\`\`json
+{
+  "newSlides": [
+    "<section class=\\"slide bg-white items-center justify-center px-16\\" id=\\"slide-13\\">...</section>"
+  ],
+  "changesSummary": "Lade till slide med omsättningsdiagram"
+}
+\`\`\`
+
 # Start Now
-Analyze the request and provide the necessary edits!`;
+Analyze the request and provide the necessary changes!`;
 }

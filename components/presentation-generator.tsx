@@ -138,54 +138,65 @@ export default function PresentationGenerator() {
       if (!reader) throw new Error('No reader available');
 
       const decoder = new TextDecoder();
+      let buffer = '';
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
+        // Accumulate chunks
+        buffer += decoder.decode(value, { stream: true });
 
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6)) as StatusUpdate;
-              setStatusUpdates((prev) => [...prev, data]);
+        // Split by double newline to get complete SSE messages
+        const messages = buffer.split('\n\n');
 
-              if (data.type === 'complete') {
-                // Support both html (direct) and htmlBase64 (encoded)
-                let html = data.html;
-                if (!html && (data as any).htmlBase64) {
-                  try {
-                    // Decode base64 with proper UTF-8 handling
-                    const binaryString = atob((data as any).htmlBase64);
-                    const bytes = new Uint8Array(binaryString.length);
-                    for (let i = 0; i < binaryString.length; i++) {
-                      bytes[i] = binaryString.charCodeAt(i);
+        // Keep the last incomplete message in the buffer
+        buffer = messages.pop() || '';
+
+        // Process each complete message
+        for (const message of messages) {
+          const lines = message.split('\n');
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6)) as StatusUpdate;
+                setStatusUpdates((prev) => [...prev, data]);
+
+                if (data.type === 'complete') {
+                  // Support both html (direct) and htmlBase64 (encoded)
+                  let html = data.html;
+                  if (!html && (data as any).htmlBase64) {
+                    try {
+                      // Decode base64 with proper UTF-8 handling
+                      const binaryString = atob((data as any).htmlBase64);
+                      const bytes = new Uint8Array(binaryString.length);
+                      for (let i = 0; i < binaryString.length; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                      }
+                      html = new TextDecoder('utf-8').decode(bytes);
+                    } catch (e) {
+                      console.error('Failed to decode base64 HTML:', e);
                     }
-                    html = new TextDecoder('utf-8').decode(bytes);
-                  } catch (e) {
-                    console.error('Failed to decode base64 HTML:', e);
                   }
-                }
 
-                if (html) {
-                  setGeneratedHTML(html);
-                  setPresentationTitle(data.title || 'Presentation');
-                  if (data.presentationData) {
-                    setPresentationData(data.presentationData);
-                  }
-                  if (data.toolCallsLogUrl) {
-                    setToolCallsLogUrl(data.toolCallsLogUrl);
-                  }
-                  // Capture usage data
-                  if (data.usage) {
-                    setUsageData(data.usage);
+                  if (html) {
+                    setGeneratedHTML(html);
+                    setPresentationTitle(data.title || 'Presentation');
+                    if (data.presentationData) {
+                      setPresentationData(data.presentationData);
+                    }
+                    if (data.toolCallsLogUrl) {
+                      setToolCallsLogUrl(data.toolCallsLogUrl);
+                    }
+                    // Capture usage data
+                    if (data.usage) {
+                      setUsageData(data.usage);
+                    }
                   }
                 }
+              } catch (e) {
+                console.error('Error parsing SSE data:', e, 'Line:', line);
               }
-            } catch (e) {
-              console.error('Error parsing SSE data:', e);
             }
           }
         }
@@ -283,53 +294,64 @@ export default function PresentationGenerator() {
       if (!reader) throw new Error('No reader available');
 
       const decoder = new TextDecoder();
+      let buffer = '';
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
+        // Accumulate chunks
+        buffer += decoder.decode(value, { stream: true });
 
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6)) as StatusUpdate;
-              setStatusUpdates((prev) => [...prev, data]);
+        // Split by double newline to get complete SSE messages
+        const messages = buffer.split('\n\n');
 
-              if (data.type === 'complete') {
-                // Decode Base64 HTML with proper UTF-8 handling
-                const htmlBase64 = (data as any).htmlBase64;
-                if (htmlBase64) {
-                  try {
-                    // Decode base64 to binary string
-                    const binaryString = atob(htmlBase64);
-                    // Convert binary string to Uint8Array
-                    const bytes = new Uint8Array(binaryString.length);
-                    for (let i = 0; i < binaryString.length; i++) {
-                      bytes[i] = binaryString.charCodeAt(i);
+        // Keep the last incomplete message in the buffer
+        buffer = messages.pop() || '';
+
+        // Process each complete message
+        for (const message of messages) {
+          const lines = message.split('\n');
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6)) as StatusUpdate;
+                setStatusUpdates((prev) => [...prev, data]);
+
+                if (data.type === 'complete') {
+                  // Decode Base64 HTML with proper UTF-8 handling
+                  const htmlBase64 = (data as any).htmlBase64;
+                  if (htmlBase64) {
+                    try {
+                      // Decode base64 to binary string
+                      const binaryString = atob(htmlBase64);
+                      // Convert binary string to Uint8Array
+                      const bytes = new Uint8Array(binaryString.length);
+                      for (let i = 0; i < binaryString.length; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                      }
+                      // Decode UTF-8 bytes to string
+                      const html = new TextDecoder('utf-8').decode(bytes);
+                      setGeneratedHTML(html);
+                      setPresentationTitle(data.title || presentationTitle);
+                      if (data.presentationData) {
+                        setPresentationData(data.presentationData);
+                      }
+                      if (data.toolCallsLogUrl) {
+                        setToolCallsLogUrl(data.toolCallsLogUrl);
+                      }
+                      // Capture usage data
+                      if (data.usage) {
+                        setUsageData(data.usage);
+                      }
+                    } catch (decodeError) {
+                      console.error('Failed to decode Base64 HTML:', decodeError);
                     }
-                    // Decode UTF-8 bytes to string
-                    const html = new TextDecoder('utf-8').decode(bytes);
-                    setGeneratedHTML(html);
-                    setPresentationTitle(data.title || presentationTitle);
-                    if (data.presentationData) {
-                      setPresentationData(data.presentationData);
-                    }
-                    if (data.toolCallsLogUrl) {
-                      setToolCallsLogUrl(data.toolCallsLogUrl);
-                    }
-                    // Capture usage data
-                    if (data.usage) {
-                      setUsageData(data.usage);
-                    }
-                  } catch (decodeError) {
-                    console.error('Failed to decode Base64 HTML:', decodeError);
                   }
                 }
+              } catch (e) {
+                console.error('Error parsing SSE data:', e, 'Line:', line);
               }
-            } catch (e) {
-              console.error('Error parsing SSE data:', e);
             }
           }
         }
@@ -361,17 +383,20 @@ export default function PresentationGenerator() {
     <div className="min-h-screen p-8 transition-colors bg-gradient-to-br from-blue-50 via-white to-green-50 dark:from-slate-950 dark:via-[#050b18] dark:to-[#041022]">
       <div className="max-w-[1800px] mx-auto">
         <div className="grid grid-cols-1 xl:grid-cols-5 gap-8">
-          {/* Left Column: Input */}
+          {/* Left Column: Input/Chat + Status */}
           <div className="xl:col-span-2 space-y-6">
-            <ShimmerContainer active={shouldHighlightPrompt}>
-              <Card>
-                <CardHeader>
-                  <CardTitle>Vad vill du skapa?</CardTitle>
-                  <CardDescription>
-                    Beskriv vilken presentation du vill generera
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
+            {/* Top-left: Prompt Input OR Chat Interface */}
+            {!generatedHTML ? (
+              /* STEP 1: Initial Prompt Input */
+              <ShimmerContainer active={shouldHighlightPrompt}>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Vad vill du skapa?</CardTitle>
+                    <CardDescription>
+                      Beskriv vilken presentation du vill generera
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
                   {/* Model Selector */}
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-foreground/80 dark:text-foreground">
@@ -442,10 +467,31 @@ export default function PresentationGenerator() {
                         Generera Presentation
                       </>
                     )}
-                  </Button>
-                </CardContent>
-              </Card>
-            </ShimmerContainer>
+                    </Button>
+                  </CardContent>
+                </Card>
+              </ShimmerContainer>
+            ) : (
+              /* STEP 2: Chat Interface (after generation) */
+              <ShimmerContainer active={shouldHighlightTweakArea} radius="1.25rem">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Justera Presentation</CardTitle>
+                    <CardDescription>
+                      Beskriv ändringar du vill göra i presentationen
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ChatInterface
+                      messages={messages}
+                      onSendMessage={handleTweak}
+                      isTweaking={isTweaking}
+                      disabled={!generatedHTML}
+                    />
+                  </CardContent>
+                </Card>
+              </ShimmerContainer>
+            )}
 
             {/* Status Updates */}
             {statusUpdates.length > 0 && (
@@ -458,7 +504,7 @@ export default function PresentationGenerator() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                    <div className="space-y-3 max-h-48 overflow-y-auto">
                       {statusUpdates.map((update, i) => (
                         <div key={i} className="flex items-start gap-3">
                           {update.type === 'status' && (
@@ -559,29 +605,6 @@ export default function PresentationGenerator() {
                       </div>
                     </div>
                   )}
-
-                  {/* Tweak Presentation - Always visible, disabled until presentation is ready */}
-                  <div className="mt-6">
-                    <ShimmerContainer active={shouldHighlightTweakArea} radius="1.25rem">
-                      <div className="pt-6 border-t border-border/40 dark:border-border/60">
-                        <h3 className={`text-lg font-semibold mb-2 ${!generatedHTML ? 'text-muted-foreground/70' : 'text-foreground'}`}>
-                          Justera Presentation (efter generering är gjord)
-                        </h3>
-                        {/* <p className={`text-sm mb-4 ${!generatedHTML ? 'text-gray-400' : 'text-gray-600'}`}>
-                    Beskriv ändringar du vill göra (använder diff editing för snabbare resultat)
-                  </p> */}
-
-                        <div className="space-y-2">
-                          <ChatInterface
-                            messages={messages}
-                            onSendMessage={handleTweak}
-                            isTweaking={isTweaking}
-                            disabled={!generatedHTML}
-                          />
-                        </div>
-                      </div>
-                    </ShimmerContainer>
-                  </div>
                 </CardContent>
               </Card>
             </ShimmerContainer>

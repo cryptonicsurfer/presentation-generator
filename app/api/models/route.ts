@@ -68,6 +68,10 @@ function getGeminiModelInfo(modelId: string): ModelInfo | null {
       name: 'Gemini 2.5 Pro',
       description: 'Mer avancerad resonemang'
     },
+    'gemini-3-pro-preview': {
+      name: 'Gemini 3.0 Pro Preview',
+      description: 'Experimentell - mest kraftfull Gemini'
+    },
     // Legacy naming (deprecated)
     'gemini-flash-latest': {
       name: 'Gemini Flash (Legacy)',

@@ -249,7 +249,7 @@ async function executeFbgAnalytics(args: { query: string; params?: any[] }): Pro
     // Hard limit: max 20 rows to avoid overwhelming Gemini API
     const MAX_ROWS = 20;
     const limitedRows = result.rows.slice(0, MAX_ROWS);
-    const wasTruncated = result.rowCount > MAX_ROWS;
+    const wasTruncated = (result.rowCount || 0) > MAX_ROWS;
 
     return {
       success: true,

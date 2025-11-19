@@ -98,19 +98,45 @@ export async function POST(req: NextRequest) {
         let changesSummary = 'Uppdaterat';
 
         try {
-          // Try to parse JSON response with edits
+          // Try to parse JSON response with edits or newSlides
           const jsonMatch = result.match(/```json\s*([\s\S]*?)\s*```/) ||
-            result.match(/\{[\s\S]*?"edits"[\s\S]*?\}/);
+            result.match(/\{[\s\S]*?("edits"|"newSlides")[\s\S]*?\}/);
 
           if (jsonMatch) {
             const jsonStr = jsonMatch[1] || jsonMatch[0];
             const tweakData = JSON.parse(jsonStr);
 
-            if (tweakData.edits && Array.isArray(tweakData.edits)) {
+            // Handle adding new slides
+            if (tweakData.newSlides && Array.isArray(tweakData.newSlides)) {
+              // Find the thank you slide position
+              const thankYouMatch = updatedHTML.match(/(<section[^>]*id="slide-thankyou"[^>]*>[\s\S]*?<\/section>)/);
+
+              if (thankYouMatch) {
+                const thankYouSlide = thankYouMatch[1];
+                const beforeThankYou = updatedHTML.substring(0, thankYouMatch.index);
+                const afterThankYou = updatedHTML.substring(thankYouMatch.index! + thankYouSlide.length);
+
+                // Insert new slides before thank you slide
+                const newSlidesHTML = tweakData.newSlides.join('\n        ');
+                updatedHTML = beforeThankYou + newSlidesHTML + '\n        ' + thankYouSlide + afterThankYou;
+
+                changesSummary = tweakData.changesSummary || `Lade till ${tweakData.newSlides.length} nya slides`;
+
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                  type: 'status',
+                  message: `Ändringar: ${changesSummary}`
+                })}\n\n`));
+              } else {
+                console.error('[Tweak] Could not find thank you slide to insert new slides before it');
+                changesSummary = 'Fel: Kunde inte hitta thank you slide';
+              }
+            }
+            // Handle editing existing slides
+            else if (tweakData.edits && Array.isArray(tweakData.edits)) {
               // Apply all edits
               updatedHTML = currentHTML;
               for (const edit of tweakData.edits) {
-                if (edit.old_string && edit.new_string) {
+                if (edit.old_string !== undefined && edit.new_string !== undefined) {
                   if (edit.target_id) {
                     // ID-based targeting (Robust)
                     const idRegex = new RegExp(`(<section[^>]*id="${edit.target_id}"[^>]*>)([\\s\\S]*?)(<\\/section>)`);
