@@ -80,7 +80,8 @@ export function SlideSelector({
     setIsDragging(false);
   };
 
-  const contentSlides = slides.filter(s => s.type === 'content');
+  // Show ALL slides (including title and thank you)
+  const allSlides = slides;
   const selectedCount = selectedSlideIds.length;
 
   return (
@@ -157,7 +158,7 @@ export function SlideSelector({
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseLeave}
         >
-          {contentSlides.map((slide) => {
+          {allSlides.map((slide) => {
             const isSelected = selectedSlideIds.includes(slide.id);
             const isHovered = hoveredSlide === slide.id;
 
@@ -175,15 +176,13 @@ export function SlideSelector({
                   } ${isHovered ? 'scale-105' : ''}`}
                   onClick={() => handleToggleSlide(slide.id)}
                 >
-                  {/* Simple thumbnail placeholder */}
-                  <div className="w-[200px] h-[113px] border-2 border-border/40 rounded-lg overflow-hidden bg-gradient-to-br from-blue-900 to-blue-950 flex items-center justify-center text-white">
-                    <div className="text-center px-4">
-                      <div className="text-3xl font-bold mb-2">#{slide.index + 1}</div>
-                      <div className="text-xs opacity-80 line-clamp-2">
-                        {slide.title || `Slide ${slide.index + 1}`}
-                      </div>
-                    </div>
-                  </div>
+                  {/* Real thumbnail using SlideThumbnail component */}
+                  <SlideThumbnail
+                    slide={slide}
+                    fullHtml={fullHtml}
+                    width={200}
+                    height={113}
+                  />
 
                   {/* Selection overlay */}
                   {isSelected && (
@@ -227,7 +226,7 @@ export function SlideSelector({
       </div>
 
       {/* Empty state */}
-      {contentSlides.length === 0 && (
+      {allSlides.length === 0 && (
         <div className="text-center py-12 text-muted-foreground">
           <p>Inga slides att visa. Generera en presentation först.</p>
         </div>
