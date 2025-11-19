@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
         if (provider === 'claude') {
           await generateWithClaude(controller, encoder, userPrompt, model);
         } else if (provider === 'gemini') {
-          await generateWithGemini(controller, encoder, userPrompt, model);
+          await generateWithGemini(controller, encoder, userPrompt, model, thinkingLevel);
         }
       } catch (error) {
         console.error('Error generating presentation:', error);
@@ -86,7 +86,8 @@ async function generateWithGemini(
   controller: ReadableStreamDefaultController,
   encoder: TextEncoder,
   userPrompt: string,
-  model: string
+  model: string,
+  thinkingLevel?: 'low' | 'high'
 ) {
   // Check for Google API key
   if (!process.env.GOOGLE_API_KEY) {
