@@ -43,3 +43,27 @@ export function injectLogos(html: string): string {
     .replace(/{{LOGO_SVART}}/g, getLogoSvartLigg())
     .replace(/{{LOGO_VIT}}/g, getLogoVitLigg());
 }
+
+/**
+ * Logo URLs for use in AI prompts (much smaller than base64)
+ */
+const LOGO_SVART_URL = 'https://kommun.falkenberg.se/document/om-kommunen/grafisk-profil/kommunens-logotyper/staende-logotyper-foer-skaerm/1621-falkenbergskommun-logo-svart-sta-1/file';
+const LOGO_VIT_URL = 'https://kommun.falkenberg.se/document/om-kommunen/grafisk-profil/kommunens-logotyper/staende-logotyper-foer-skaerm/1622-falkenbergskommun-logo-vit-sta-1/file';
+
+/**
+ * Replace base64 logos with URL versions for AI prompts (saves ~100k tokens)
+ */
+export function logosToUrls(html: string): string {
+  return html
+    .replace(new RegExp(getLogoSvartLigg().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), LOGO_SVART_URL)
+    .replace(new RegExp(getLogoVitLigg().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), LOGO_VIT_URL);
+}
+
+/**
+ * Replace URL logos back to base64 (for standalone HTML files)
+ */
+export function urlsToLogos(html: string): string {
+  return html
+    .replace(new RegExp(LOGO_SVART_URL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), getLogoSvartLigg())
+    .replace(new RegExp(LOGO_VIT_URL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), getLogoVitLigg());
+}

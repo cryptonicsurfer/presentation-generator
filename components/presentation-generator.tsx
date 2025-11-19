@@ -9,8 +9,10 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, Download, Eye, Maximize2, FileJson, Sparkles } from 'lucide-react';
 import type { ModelInfo } from '@/app/api/models/route';
-import { formatCost } from '@/lib/pricing';
+import { formatCost, calculateCost } from '@/lib/pricing';
 import { ChatInterface, type Message } from './chat-interface';
+import { SlideSelector } from './slide-selector';
+import { extractSlides, deleteSlides, renumberSlides, type Slide } from '@/lib/presentation/slide-parser';
 
 type StatusUpdate = {
   type: 'status' | 'tool' | 'thinking' | 'error' | 'complete';
@@ -72,6 +74,8 @@ export default function PresentationGenerator() {
   const [isTweaking, setIsTweaking] = useState(false);
   const [toolCallsLogUrl, setToolCallsLogUrl] = useState<string | null>(null);
   const [usageData, setUsageData] = useState<{ inputTokens: number; outputTokens: number; totalTokens: number; cost: number } | null>(null);
+  const [slides, setSlides] = useState<Slide[]>([]);
+  const [selectedSlideIds, setSelectedSlideIds] = useState<string[]>([]);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const examplePrompts = [
@@ -188,9 +192,19 @@ export default function PresentationGenerator() {
                     if (data.toolCallsLogUrl) {
                       setToolCallsLogUrl(data.toolCallsLogUrl);
                     }
-                    // Capture usage data
+                    // Capture usage data and calculate cost
                     if (data.usage) {
-                      setUsageData(data.usage);
+                      const cost = calculateCost(
+                        selectedModel,
+                        data.usage.inputTokens,
+                        data.usage.outputTokens
+                      );
+                      setUsageData({
+                        inputTokens: data.usage.inputTokens,
+                        outputTokens: data.usage.outputTokens,
+                        totalTokens: data.usage.totalTokens,
+                        cost
+                      });
                     }
                   }
                 }
@@ -242,6 +256,12 @@ export default function PresentationGenerator() {
   useEffect(() => {
     if (generatedHTML && iframeRef.current) {
       handlePreview();
+
+      // Extract slides for selection
+      const extractedSlides = extractSlides(generatedHTML);
+      setSlides(extractedSlides);
+      // Reset selection when new presentation is generated
+      setSelectedSlideIds([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [generatedHTML]);
@@ -261,8 +281,48 @@ export default function PresentationGenerator() {
     }
   };
 
+  const handleDeleteSlides = () => {
+    if (!generatedHTML || selectedSlideIds.length === 0) return;
+
+    // Confirmation dialog
+    const slideNums = selectedSlideIds.map(id => {
+      const match = id.match(/\d+/);
+      return match ? parseInt(match[0]) + 1 : '?';
+    }).join(', ');
+
+    const confirmed = window.confirm(
+      `Är du säker på att du vill ta bort ${selectedSlideIds.length} slide${selectedSlideIds.length > 1 ? 's' : ''}?\n\nSlides: ${slideNums}\n\nDenna åtgärd kan inte ångras.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      // Delete selected slides
+      let updatedHtml = deleteSlides(generatedHTML, selectedSlideIds);
+
+      // Renumber remaining slides
+      updatedHtml = renumberSlides(updatedHtml);
+
+      // Update state
+      setGeneratedHTML(updatedHtml);
+
+      // Extract updated slides
+      const updatedSlidesList = extractSlides(updatedHtml);
+      setSlides(updatedSlidesList);
+
+      // Clear selection
+      setSelectedSlideIds([]);
+
+      // Show success message
+      alert(`${selectedSlideIds.length} slide${selectedSlideIds.length > 1 ? 's' : ''} har tagits bort.`);
+    } catch (error) {
+      console.error('Error deleting slides:', error);
+      alert('Ett fel uppstod när slides skulle tas bort. Försök igen.');
+    }
+  };
+
   const handleTweak = async (messageContent: string) => {
-    if (!messageContent.trim() || !presentationData) return;
+    if (!messageContent.trim() || !presentationData || !generatedHTML) return;
 
     // Add user message to history
     const newMessages: Message[] = [
@@ -274,7 +334,13 @@ export default function PresentationGenerator() {
     setStatusUpdates([]);
 
     try {
-      const response = await fetch('/api/tweak', {
+      // Use different endpoint based on whether slides are selected
+      const endpoint = selectedSlideIds.length > 0 ? '/api/tweak-slides' : '/api/tweak';
+      console.log('[handleTweak] Using endpoint:', endpoint);
+      console.log('[handleTweak] Selected slide IDs:', selectedSlideIds);
+      console.log('[handleTweak] Messages count:', newMessages.length);
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -282,9 +348,13 @@ export default function PresentationGenerator() {
         body: JSON.stringify({
           messages: newMessages.map(m => ({ role: m.role, content: m.content })),
           presentationData,
+          currentHtml: generatedHTML, // Send current HTML for slide extraction
+          selectedSlideIds: selectedSlideIds.length > 0 ? selectedSlideIds : undefined,
           model: selectedModel,
         }),
       });
+
+      console.log('[handleTweak] Response received:', response.status, response.ok);
 
       if (!response.ok) {
         throw new Error('Failed to tweak presentation');
@@ -340,9 +410,19 @@ export default function PresentationGenerator() {
                       if (data.toolCallsLogUrl) {
                         setToolCallsLogUrl(data.toolCallsLogUrl);
                       }
-                      // Capture usage data
+                      // Accumulate usage data and calculate total cost
                       if (data.usage) {
-                        setUsageData(data.usage);
+                        const newCost = calculateCost(
+                          selectedModel,
+                          data.usage.inputTokens,
+                          data.usage.outputTokens
+                        );
+                        setUsageData(prev => ({
+                          inputTokens: (prev?.inputTokens || 0) + data.usage.inputTokens,
+                          outputTokens: (prev?.outputTokens || 0) + data.usage.outputTokens,
+                          totalTokens: (prev?.totalTokens || 0) + data.usage.totalTokens,
+                          cost: (prev?.cost || 0) + newCost
+                        }));
                       }
                     } catch (decodeError) {
                       console.error('Failed to decode Base64 HTML:', decodeError);
@@ -487,6 +567,8 @@ export default function PresentationGenerator() {
                       onSendMessage={handleTweak}
                       isTweaking={isTweaking}
                       disabled={!generatedHTML}
+                      selectedSlideIds={selectedSlideIds}
+                      onClearSelection={() => setSelectedSlideIds([])}
                     />
                   </CardContent>
                 </Card>
@@ -544,7 +626,7 @@ export default function PresentationGenerator() {
                         <div>{presentationTitle} ({statusUpdates.find((u) => u.type === 'complete')?.slideCount || 0} slides)</div>
                         {usageData && (
                           <div className="text-xs text-muted-foreground mt-1">
-                            {usageData.inputTokens.toLocaleString()} in · {usageData.outputTokens.toLocaleString()} out · {usageData.totalTokens.toLocaleString()} total · ${formatCost(usageData.cost)}
+                            {usageData.inputTokens.toLocaleString()} in · {usageData.outputTokens.toLocaleString()} out · {usageData.totalTokens.toLocaleString()} total{usageData.cost !== undefined ? ` · ${formatCost(usageData.cost)}` : ''}
                           </div>
                         )}
                       </>
@@ -596,6 +678,28 @@ export default function PresentationGenerator() {
                           style={{ transform: 'scale(1)', transformOrigin: 'top left' }}
                         />
                       </div>
+
+                      {/* Slide Selector */}
+                      {slides.length > 0 && (
+                        <div className="mt-6 pt-6 border-t border-border/40">
+                          <SlideSelector
+                            slides={slides}
+                            fullHtml={generatedHTML}
+                            selectedSlideIds={selectedSlideIds}
+                            onSelectionChange={setSelectedSlideIds}
+                            onModifySelected={() => {
+                              // Focus chat input when modify is clicked
+                              // The selected slides are already shown in the chat interface
+                              const chatInput = document.querySelector('textarea[placeholder*="Beskriv"]') as HTMLTextAreaElement;
+                              if (chatInput) {
+                                chatInput.focus();
+                                chatInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                              }
+                            }}
+                            onDeleteSelected={handleDeleteSlides}
+                          />
+                        </div>
+                      )}
                     </>
                   ) : (
                     <div className="flex items-center justify-center w-full aspect-[16/9] border-2 border-dashed border-border/40 dark:border-border/60 rounded-lg transition-colors">

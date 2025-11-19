@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Send, User, Bot, Loader2, Sparkles } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Send, User, Bot, Loader2, Sparkles, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export type Message = {
@@ -17,12 +18,16 @@ interface ChatInterfaceProps {
     onSendMessage: (message: string) => void;
     isTweaking: boolean;
     disabled?: boolean;
+    selectedSlideIds?: string[];
+    onClearSelection?: () => void;
 }
 
-export function ChatInterface({ messages, onSendMessage, isTweaking, disabled }: ChatInterfaceProps) {
+export function ChatInterface({ messages, onSendMessage, isTweaking, disabled, selectedSlideIds = [], onClearSelection }: ChatInterfaceProps) {
     const [input, setInput] = useState('');
     const scrollRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    const hasSelectedSlides = selectedSlideIds.length > 0;
 
     // Auto-scroll to bottom when messages change
     useEffect(() => {
@@ -106,13 +111,49 @@ export function ChatInterface({ messages, onSendMessage, isTweaking, disabled }:
 
             {/* Input Area */}
             <div className="p-4 border-t bg-background">
+                {/* Selected slides context */}
+                {hasSelectedSlides && (
+                    <div className="mb-3 p-2 bg-primary/10 rounded-lg border border-primary/20">
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-medium text-primary">Valda slides som kontext:</span>
+                            {onClearSelection && (
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 text-xs"
+                                    onClick={onClearSelection}
+                                >
+                                    <X className="w-3 h-3 mr-1" />
+                                    Rensa
+                                </Button>
+                            )}
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                            {selectedSlideIds.map((slideId) => {
+                                const slideNum = slideId.replace('slide-', '');
+                                return (
+                                    <Badge key={slideId} variant="secondary" className="text-xs">
+                                        Slide {parseInt(slideNum) + 1}
+                                    </Badge>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
                 <div className="relative">
                     <Textarea
                         ref={textareaRef}
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder={disabled ? "Generate a presentation first..." : "Type your request..."}
+                        placeholder={
+                            disabled
+                                ? "Generate a presentation first..."
+                                : hasSelectedSlides
+                                ? "Beskriv ändringar för valda slides..."
+                                : "Type your request..."
+                        }
                         disabled={disabled || isTweaking}
                         className="min-h-[60px] pr-12 resize-none"
                         rows={2}
@@ -127,7 +168,10 @@ export function ChatInterface({ messages, onSendMessage, isTweaking, disabled }:
                     </Button>
                 </div>
                 <div className="text-xs text-muted-foreground mt-2 text-center">
-                    Tip: You can refer to specific slides (e.g., "slide 3")
+                    {hasSelectedSlides
+                        ? "Dina ändringar kommer endast påverka valda slides"
+                        : "Tip: Du kan välja slides nedan eller referera till dem (ex. 'slide 3')"
+                    }
                 </div>
             </div>
         </div>
