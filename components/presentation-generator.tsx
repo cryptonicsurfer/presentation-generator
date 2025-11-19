@@ -77,6 +77,7 @@ export default function PresentationGenerator() {
   const [slides, setSlides] = useState<Slide[]>([]);
   const [selectedSlideIds, setSelectedSlideIds] = useState<string[]>([]);
   const [thinkingLevel, setThinkingLevel] = useState<'low' | 'high' | 'off'>('off');
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const examplePrompts = [
@@ -243,6 +244,56 @@ export default function PresentationGenerator() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!generatedHTML) return;
+
+    setIsGeneratingPDF(true);
+
+    try {
+      console.log('[PDF Export] Starting PDF generation...');
+
+      const filename = `${presentationTitle.toLowerCase().replace(/\s+/g, '-')}.pdf`;
+
+      // Call API endpoint
+      const response = await fetch('/api/export-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          html: generatedHTML,
+          filename,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to generate PDF');
+      }
+
+      // Get PDF blob
+      const pdfBlob = await response.blob();
+      console.log('[PDF Export] PDF received, size:', pdfBlob.size, 'bytes');
+
+      // Trigger download
+      const url = URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      console.log('[PDF Export] PDF download triggered successfully');
+    } catch (error) {
+      console.error('[PDF Export] Error:', error);
+      alert(`PDF-generering misslyckades: ${error instanceof Error ? error.message : 'Okänt fel'}`);
+    } finally {
+      setIsGeneratingPDF(false);
+    }
   };
 
   const handlePreview = () => {
@@ -685,19 +736,40 @@ export default function PresentationGenerator() {
                 <CardContent className="space-y-4">
                   {generatedHTML ? (
                     <>
-                      <div className="flex gap-2">
-                        <Button onClick={handlePreview} variant="outline" className="flex-1">
-                          <Eye className="w-4 h-4" />
-                          Visa
-                        </Button>
-                        <Button onClick={handleFullscreen} variant="outline" className="flex-1">
-                          <Maximize2 className="w-4 h-4" />
-                          Fullscreen
-                        </Button>
-                        <Button onClick={handleDownload} className="flex-1">
-                          <Download className="w-4 h-4" />
-                          Ladda ner HTML
-                        </Button>
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <Button onClick={handlePreview} variant="outline" className="flex-1">
+                            <Eye className="w-4 h-4" />
+                            Visa
+                          </Button>
+                          <Button onClick={handleFullscreen} variant="outline" className="flex-1">
+                            <Maximize2 className="w-4 h-4" />
+                            Fullscreen
+                          </Button>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button onClick={handleDownload} variant="outline" className="flex-1">
+                            <Download className="w-4 h-4" />
+                            HTML
+                          </Button>
+                          <Button
+                            onClick={handleDownloadPDF}
+                            className="flex-1"
+                            disabled={isGeneratingPDF}
+                          >
+                            {isGeneratingPDF ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Genererar PDF...
+                              </>
+                            ) : (
+                              <>
+                                <Download className="w-4 h-4" />
+                                Ladda ner PDF
+                              </>
+                            )}
+                          </Button>
+                        </div>
                       </div>
                       {/* 
                     {toolCallsLogUrl && (
