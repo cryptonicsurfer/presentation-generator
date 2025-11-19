@@ -12,6 +12,7 @@ export interface GeminiAgentConfig {
   model?: string;
   systemInstruction?: string;
   maxTurns?: number;
+  thinkingLevel?: 'low' | 'high';
 }
 
 export interface GeminiAgentMessage {
@@ -98,14 +99,45 @@ export class GeminiAgent {
           : history;
 
         // Call Gemini with current history
-        const response = await this.genAI.models.generateContent({
-          model: this.config.model!,
-          contents,
-          config: {
-            systemInstruction: this.config.systemInstruction,
-            tools: [{ functionDeclarations: geminiTools }],
-          },
-        });
+        const apiConfig: any = {
+          systemInstruction: this.config.systemInstruction,
+          tools: [{ functionDeclarations: geminiTools }],
+        };
+
+        // Add thinking config if enabled (Gemini 3 Pro Preview only)
+        if (this.config.thinkingLevel) {
+          console.log('[GeminiAgent] Adding thinking config:', {
+            thinkingLevel: this.config.thinkingLevel,
+            model: this.config.model
+          });
+          apiConfig.thinkingConfig = {
+            thinkingLevel: this.config.thinkingLevel,
+          };
+        }
+
+        let response;
+        try {
+          response = await this.genAI.models.generateContent({
+            model: this.config.model!,
+            contents,
+            config: apiConfig,
+          });
+        } catch (error: any) {
+          // If thinking mode fails, retry without it
+          if (error.message?.includes('thinkingLevel') && this.config.thinkingLevel) {
+            console.warn('[GeminiAgent] Thinking mode not supported, retrying without it...');
+            callback?.({ type: 'status', message: 'Thinking mode inte tillgänglig, fortsätter utan...' });
+
+            delete apiConfig.thinkingConfig;
+            response = await this.genAI.models.generateContent({
+              model: this.config.model!,
+              contents,
+              config: apiConfig,
+            });
+          } else {
+            throw error;
+          }
+        }
 
         // Track token usage
         if (response.usageMetadata) {

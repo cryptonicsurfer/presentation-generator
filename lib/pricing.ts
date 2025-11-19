@@ -29,8 +29,8 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     outputPer1M: 10.00,
   },
   'gemini-3-pro-preview': {
-    inputPer1M: 1.25, // Same as 2.5 Pro for now (update when official pricing announced)
-    outputPer1M: 10.00,
+    inputPer1M: 2.00, // Tiered: $2 (<200k), $4 (>200k)
+    outputPer1M: 12.00, // Tiered: $12 (<200k), $18 (>200k)
   },
   // Legacy naming (deprecated)
   'gemini-flash-latest': {
@@ -50,6 +50,22 @@ export function calculateCost(
     return 0;
   }
 
+  // Handle tiered pricing for Gemini 3 Pro Preview
+  if (model === 'gemini-3-pro-preview') {
+    const totalTokens = inputTokens + outputTokens;
+    if (totalTokens > 200_000) {
+      // High tier: $4 input, $18 output per 1M tokens
+      const inputCost = (inputTokens / 1_000_000) * 4.00;
+      const outputCost = (outputTokens / 1_000_000) * 18.00;
+      return inputCost + outputCost;
+    }
+    // Low tier: $2 input, $12 output per 1M tokens
+    const inputCost = (inputTokens / 1_000_000) * 2.00;
+    const outputCost = (outputTokens / 1_000_000) * 12.00;
+    return inputCost + outputCost;
+  }
+
+  // Standard pricing for other models
   const inputCost = (inputTokens / 1_000_000) * pricing.inputPer1M;
   const outputCost = (outputTokens / 1_000_000) * pricing.outputPer1M;
 

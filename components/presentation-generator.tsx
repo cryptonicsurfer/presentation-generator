@@ -76,6 +76,7 @@ export default function PresentationGenerator() {
   const [usageData, setUsageData] = useState<{ inputTokens: number; outputTokens: number; totalTokens: number; cost: number } | null>(null);
   const [slides, setSlides] = useState<Slide[]>([]);
   const [selectedSlideIds, setSelectedSlideIds] = useState<string[]>([]);
+  const [thinkingLevel, setThinkingLevel] = useState<'low' | 'high' | 'off'>('off');
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const examplePrompts = [
@@ -131,7 +132,11 @@ export default function PresentationGenerator() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ prompt, model: selectedModel }),
+        body: JSON.stringify({
+          prompt,
+          model: selectedModel,
+          thinkingLevel: thinkingLevel !== 'off' ? thinkingLevel : undefined
+        }),
       });
 
       if (!response.ok) {
@@ -478,29 +483,71 @@ export default function PresentationGenerator() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                   {/* Model Selector */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground/80 dark:text-foreground">
-                      AI-modell
-                    </label>
-                    <Select
-                      value={selectedModel}
-                      onValueChange={setSelectedModel}
-                      disabled={isGenerating || availableModels.length === 0}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Välj AI-modell" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableModels.map((model) => (
-                          <SelectItem key={model.id} value={model.id}>
-                            <div className="flex flex-col items-start">
-                              <span className="font-medium">{model.name}</span>
-                              <span className="text-xs text-muted-foreground">{model.description}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="flex gap-4">
+                    {/* AI Model Selector */}
+                    <div className="space-y-2 flex-1">
+                      <label className="text-sm font-medium text-foreground/80 dark:text-foreground">
+                        AI-modell
+                      </label>
+                      <Select
+                        value={selectedModel}
+                        onValueChange={setSelectedModel}
+                        disabled={isGenerating || availableModels.length === 0}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Välj AI-modell" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableModels.map((model) => (
+                            <SelectItem key={model.id} value={model.id}>
+                              <div className="flex flex-col items-start">
+                                <span className="font-medium">{model.name}</span>
+                                <span className="text-xs text-muted-foreground">{model.description}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Thinking Level Selector - only for Gemini 3 Pro Preview */}
+                    {selectedModel === 'gemini-3-pro-preview' && (
+                      <div className="space-y-2 flex-1">
+                        <label className="text-sm font-medium text-foreground/80 dark:text-foreground flex items-center gap-2">
+                          <Sparkles className="w-4 h-4" />
+                          Thinking Mode
+                        </label>
+                        <Select
+                          value={thinkingLevel}
+                          onValueChange={(value) => setThinkingLevel(value as 'low' | 'high' | 'off')}
+                          disabled={isGenerating}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Välj thinking level" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="off">
+                              <div className="flex flex-col items-start">
+                                <span className="font-medium">Off</span>
+                                <span className="text-xs text-muted-foreground">Standard generation (no thinking)</span>
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="low">
+                              <div className="flex flex-col items-start">
+                                <span className="font-medium">Low</span>
+                                <span className="text-xs text-muted-foreground">Basic reasoning steps</span>
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="high">
+                              <div className="flex flex-col items-start">
+                                <span className="font-medium">High</span>
+                                <span className="text-xs text-muted-foreground">Detailed thought process</span>
+                              </div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </div>
 
                   <Textarea

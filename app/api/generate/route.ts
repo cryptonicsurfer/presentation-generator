@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     async start(controller) {
       try {
         const body = await req.json();
-        const { prompt: userPrompt, model = getDefaultModel() } = body;
+        const { prompt: userPrompt, model = getDefaultModel(), thinkingLevel } = body;
 
         if (!userPrompt) {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', message: 'Prompt is required' })}\n\n`));
@@ -120,6 +120,7 @@ async function generateWithGemini(
     model: model,
     systemInstruction: systemPrompt,
     maxTurns: 25, // Balanced: enough for complex prompts, not too many to cause issues
+    thinkingLevel: thinkingLevel, // Enable thinking mode for Gemini 3 Pro Preview
   });
 
   // Tool name to user-friendly message mapping
