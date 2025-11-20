@@ -3,6 +3,7 @@ import { extractSlides, replaceSlides, type Slide } from '@/lib/presentation/sli
 import { GeminiAgent } from '@/lib/agents/gemini-agent';
 import { geminiTools } from '@/lib/agents/gemini-tools';
 import { logosToUrls, urlsToLogos } from '@/lib/presentation/logos';
+import { captureMultipleSlideScreenshots } from '@/lib/utils/screenshot';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300; // 5 minutes
@@ -101,6 +102,31 @@ export async function POST(request: NextRequest) {
           message: `Förbereder AI-prompt för ${selectedSlides.length} slides...`
         })}\n\n`));
 
+        // Capture screenshots of selected slides for visual context
+        let screenshots: Array<{ data: string; mimeType: string }> | undefined;
+        try {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+            type: 'status',
+            message: `Tar screenshots av ${selectedSlides.length} slide(s) för visuell kontext...`
+          })}\n\n`));
+
+          const screenshotMap = await captureMultipleSlideScreenshots(
+            currentHtml,
+            selectedSlideIds,
+            { width: 1920, height: 1080, format: 'png' }
+          );
+
+          screenshots = Object.values(screenshotMap).map(base64 => ({
+            data: base64,
+            mimeType: 'image/png',
+          }));
+
+          console.log(`[tweak-slides] Captured ${screenshots.length} screenshots for visual context`);
+        } catch (error) {
+          console.error('[tweak-slides] Failed to capture screenshots:', error);
+          // Continue without screenshots
+        }
+
         // Create focused system prompt for slide editing
         const slidesList = selectedSlides
           .map(s => `- ${s.id}: ${s.title || 'Untitled'}`)
@@ -111,7 +137,12 @@ export async function POST(request: NextRequest) {
           .map(s => logosToUrls(s.html))
           .join('\n\n');
 
-        const systemPrompt = `You are a presentation slide editor. The user wants to modify specific slides in their presentation.
+        const hasVisualContext = screenshots && screenshots.length > 0;
+        const visualContextNote = hasVisualContext
+          ? `\n\n**IMPORTANT: You have been provided with SCREENSHOTS of these slides as visual context. Use these images to see exactly what the slides look like, including colors, layouts, charts, and visual elements. Reference the screenshots when making visual changes.**\n`
+          : '';
+
+        const systemPrompt = `You are a presentation slide editor. The user wants to modify specific slides in their presentation.${visualContextNote}
 
 **Selected Slides to Modify:**
 ${slidesList}
@@ -171,7 +202,7 @@ Return a JSON array of updated slides:
         }));
         console.log('[tweak-slides] Running Gemini agent with', geminiMessages.length, 'messages...');
 
-        // Run agent - destructure the response like in generate endpoint
+        // Run agent with screenshots for visual context
         const { result: responseText, toolCallsLog, usage } = await agent.run(
           geminiMessages[geminiMessages.length - 1].content,
           (update) => {
@@ -187,7 +218,7 @@ Return a JSON array of updated slides:
               })}\n\n`));
             }
           },
-          geminiMessages.slice(0, -1)
+          screenshots // Pass screenshots for visual context
         );
 
         console.log('[tweak-slides] Agent finished. Response length:', responseText.length);

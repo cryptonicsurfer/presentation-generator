@@ -329,7 +329,75 @@ export default function PresentationGenerator() {
     const doc = iframe.contentDocument || iframe.contentWindow?.document;
     if (doc) {
       doc.open();
-      doc.write(generatedHTML);
+
+      // Inject scaling wrapper and CSS
+      // We use 'zoom' for better visual quality than transform: scale
+      // We force scrollbars to prevent jitter/resize loops with Chart.js
+      const scalingCSS = `
+        <style>
+          /* Force scrollbar to prevent layout jumps that trigger Chart.js resize loops */
+          html {
+            overflow-y: scroll;
+          }
+          
+          body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            min-height: 100vh;
+          }
+          
+          /* The wrapper that handles the scaling */
+          #presentation-wrapper {
+            width: 100%;
+            min-height: 100vh;
+            
+            /* Default Preview Mode: Zoom 0.75 */
+            zoom: 0.75;
+          }
+
+          /* Fullscreen Mode Override */
+          body.is-fullscreen #presentation-wrapper {
+            zoom: 1.25;
+          }
+          
+          /* Ensure charts don't expand infinitely or shrink to zero */
+          canvas {
+            width: 100% !important;
+            height: 100% !important;
+            min-height: 300px; /* Prevent collapse to 0 height */
+            max-width: 100% !important;
+          }
+          
+          /* Container for charts to maintain aspect ratio/size */
+          .chart-container {
+            position: relative;
+            width: 100%;
+            height: 400px; /* Default height */
+            overflow: hidden;
+          }
+        </style>
+      `;
+
+      // Wrap the content
+      let htmlWithWrapper = generatedHTML;
+
+      // Inject CSS before </head>
+      if (htmlWithWrapper.includes('</head>')) {
+        htmlWithWrapper = htmlWithWrapper.replace('</head>', scalingCSS + '</head>');
+      } else {
+        htmlWithWrapper = scalingCSS + htmlWithWrapper;
+      }
+
+      // Wrap body content in #presentation-wrapper
+      if (htmlWithWrapper.includes('<body')) {
+        htmlWithWrapper = htmlWithWrapper.replace(/<body([^>]*)>/i, '<body$1><div id="presentation-wrapper">');
+        htmlWithWrapper = htmlWithWrapper.replace('</body>', '</div></body>');
+      } else {
+        htmlWithWrapper = `<div id="presentation-wrapper">${htmlWithWrapper}</div>`;
+      }
+
+      doc.write(htmlWithWrapper);
       doc.close();
     }
   };
@@ -352,6 +420,40 @@ export default function PresentationGenerator() {
     if (!iframeRef.current) return;
 
     const iframe = iframeRef.current;
+
+    // Helper to toggle class on iframe body
+    const toggleFullscreenClass = (isFullscreen: boolean) => {
+      const doc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (doc && doc.body) {
+        if (isFullscreen) {
+          doc.body.classList.add('is-fullscreen');
+        } else {
+          doc.body.classList.remove('is-fullscreen');
+        }
+      }
+    };
+
+    // Add event listener to detect fullscreen change
+    const onFullscreenChange = () => {
+      const isFullscreen = !!document.fullscreenElement ||
+        !!(document as any).webkitFullscreenElement ||
+        !!(document as any).msFullscreenElement;
+
+      toggleFullscreenClass(isFullscreen);
+
+      // Cleanup listener if we exited fullscreen
+      if (!isFullscreen) {
+        document.removeEventListener('fullscreenchange', onFullscreenChange);
+        document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
+        document.removeEventListener('mozfullscreenchange', onFullscreenChange);
+        document.removeEventListener('MSFullscreenChange', onFullscreenChange);
+      }
+    };
+
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+    document.addEventListener('mozfullscreenchange', onFullscreenChange);
+    document.addEventListener('MSFullscreenChange', onFullscreenChange);
 
     // Try to request fullscreen on the iframe
     if (iframe.requestFullscreen) {

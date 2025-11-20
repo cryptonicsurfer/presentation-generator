@@ -55,7 +55,8 @@ export class GeminiAgent {
    */
   async run(
     userPrompt: string,
-    callback?: GeminiAgentCallback
+    callback?: GeminiAgentCallback,
+    images?: Array<{ data: string; mimeType: string }>
   ): Promise<{
     result: string;
     toolCallsLog: ToolCallLog[];
@@ -95,7 +96,19 @@ export class GeminiAgent {
 
         // Build contents for this request
         const contents = turnCount === 1
-          ? [{ role: 'user' as const, parts: [{ text: userPrompt }] }]
+          ? [{
+              role: 'user' as const,
+              parts: [
+                { text: userPrompt },
+                // Add images if provided (for visual context)
+                ...(images || []).map(img => ({
+                  inlineData: {
+                    mimeType: img.mimeType,
+                    data: img.data,
+                  }
+                }))
+              ]
+            }]
           : history;
 
         // Call Gemini with current history

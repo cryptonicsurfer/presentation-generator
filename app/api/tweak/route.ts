@@ -4,6 +4,7 @@ import { generateGeminiTweakPrompt } from '@/lib/presentation/gemini-skills-load
 import { generatePresentationHTML, generateTitleSlide, generateThankYouSlide } from '@/lib/presentation/template';
 import { calculateCost } from '@/lib/pricing';
 import { getDefaultGeminiModel } from '@/lib/config/models';
+import { captureMultipleSlideScreenshots } from '@/lib/utils/screenshot';
 import { writeFileSync } from 'fs';
 import { join } from 'path';
 
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest) {
     async start(controller) {
       try {
         const body = await req.json();
-        const { messages, presentationData: originalPresentationData } = body;
+        const { messages, presentationData: originalPresentationData, selectedSlideIds } = body;
 
         // Support legacy single-prompt requests
         const tweakPrompt = body.tweakPrompt;
@@ -51,8 +52,40 @@ export async function POST(req: NextRequest) {
         ];
         const currentHTML = generatePresentationHTML(currentTitle, fullSections);
 
+        // Determine which slides need visual context (screenshots)
+        const lastUserMessage = history[history.length - 1]?.content || '';
+        const slideIdsToCapture = determineSlideIdsForScreenshots(lastUserMessage, selectedSlideIds, currentSections);
+
+        // Capture screenshots if needed
+        let screenshots: Array<{ data: string; mimeType: string }> | undefined;
+        if (slideIdsToCapture.length > 0) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+            type: 'status',
+            message: `Tar screenshots av ${slideIdsToCapture.length} slide(s) för visuell kontext...`
+          })}\n\n`));
+
+          try {
+            const screenshotMap = await captureMultipleSlideScreenshots(currentHTML, slideIdsToCapture, {
+              width: 1920,
+              height: 1080,
+              format: 'png',
+            });
+
+            screenshots = Object.values(screenshotMap).map(base64 => ({
+              data: base64,
+              mimeType: 'image/png',
+            }));
+
+            console.log(`[Tweak] Captured ${screenshots.length} screenshots for visual context`);
+          } catch (error) {
+            console.error('[Tweak] Failed to capture screenshots:', error);
+            // Continue without screenshots
+          }
+        }
+
         // Generate tweak-specific system prompt
-        const systemPrompt = await generateGeminiTweakPrompt(history, currentHTML, currentTitle);
+        const hasVisualContext = screenshots && screenshots.length > 0;
+        const systemPrompt = await generateGeminiTweakPrompt(history, currentHTML, currentTitle, hasVisualContext);
 
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'status', message: 'Ansluter till Gemini...' })}\n\n`));
 
@@ -73,7 +106,7 @@ export async function POST(req: NextRequest) {
           'get_directus_contacts': 'Hämtar kontaktpersoner...',
         };
 
-        // Run Gemini agent with callbacks
+        // Run Gemini agent with callbacks (including screenshots for visual context)
         const lastUserMessage = history[history.length - 1].content;
         const { result, toolCallsLog, usage } = await agent.run(lastUserMessage, (message) => {
           if (message.type === 'tool' && message.tool) {
@@ -89,7 +122,7 @@ export async function POST(req: NextRequest) {
               message: 'Gemini justerar presentationen...'
             })}\n\n`));
           }
-        });
+        }, screenshots);
 
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'status', message: 'Behandlar ändringar...' })}\n\n`));
 
@@ -274,4 +307,65 @@ export async function POST(req: NextRequest) {
       'Connection': 'keep-alive',
     },
   });
+}
+
+/**
+ * Determine which slides need screenshots for visual context
+ * Priority:
+ * 1. Selected slides from carousel
+ * 2. Slides mentioned in user message (e.g., "slide 3", "denna slide")
+ * 3. All slides if user mentions visual changes without specifics
+ */
+function determineSlideIdsForScreenshots(
+  userMessage: string,
+  selectedSlideIds?: string[],
+  currentSections?: string[]
+): string[] {
+  const slideIds: Set<string> = new Set();
+
+  // 1. Add explicitly selected slides
+  if (selectedSlideIds && selectedSlideIds.length > 0) {
+    selectedSlideIds.forEach(id => slideIds.add(id));
+    return Array.from(slideIds);
+  }
+
+  // 2. Parse message for slide references
+  const messageLower = userMessage.toLowerCase();
+
+  // Match patterns like "slide 3", "slide 2-4", etc.
+  const slideNumberMatches = messageLower.matchAll(/slide[s]?\s+(\d+)(?:\s*-\s*(\d+))?/g);
+  for (const match of slideNumberMatches) {
+    const start = parseInt(match[1]);
+    const end = match[2] ? parseInt(match[2]) : start;
+
+    for (let i = start; i <= end; i++) {
+      // Convert 1-based index to slide ID
+      // slide-0 is title, slide-1 is first content slide, etc.
+      if (i === 1) {
+        slideIds.add('slide-title');
+      } else if (currentSections && i === currentSections.length + 2) {
+        slideIds.add('slide-thankyou');
+      } else if (i > 1 && currentSections && i <= currentSections.length + 1) {
+        slideIds.add(`slide-${i - 2}`);
+      }
+    }
+  }
+
+  // 3. Check for visual-related keywords that benefit from screenshots
+  const visualKeywords = [
+    'chart', 'diagram', 'graf', 'färg', 'color', 'layout', 'design',
+    'denna', 'this', 'den här', 'det här'
+  ];
+
+  const hasVisualKeywords = visualKeywords.some(keyword => messageLower.includes(keyword));
+
+  // If visual keywords and no specific slides mentioned, capture all content slides
+  if (hasVisualKeywords && slideIds.size === 0 && currentSections) {
+    // Add all content slides (skip title and thank you for now)
+    for (let i = 0; i < currentSections.length; i++) {
+      slideIds.add(`slide-${i}`);
+    }
+  }
+
+  return Array.from(slideIds);
 }

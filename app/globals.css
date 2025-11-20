@@ -65,18 +65,18 @@
   --card-foreground: oklch(0.97 0.015 270);
   --popover: oklch(0.25 0.03 258.2);
   --popover-foreground: oklch(0.97 0.015 270);
-  --primary: oklch(0.68 0.16 276.9349);
+  --primary: oklch(80.641% 0.09939 238.923);
   --primary-foreground: oklch(0.13 0.01 260);
   --secondary: oklch(0.74 0.12 182.5025);
   --secondary-foreground: oklch(0.13 0.01 260);
   --muted: oklch(0.32 0.015 255);
   --muted-foreground: oklch(0.84 0.02 264);
-  --accent: oklch(0.72 0.1 91.6054);
+  --accent: oklch(83.3% 0.16983 86.71);
   --accent-foreground: oklch(0.13 0.01 260);
   --destructive: oklch(0.61 0.17 25.3313);
   --destructive-foreground: oklch(0.13 0.01 260);
-  --border: oklch(0.33 0.015 257);
-  --input: oklch(0.33 0.015 257);
+  --border: oklch(42.831% 0.02811 258.397);
+  --input: oklch(44.585% 0.08383 238.323);
   --ring: oklch(0.62 0.13 274.7134);
   --chart-1: oklch(0.68 0.16 276.9349);
   --chart-2: oklch(0.74 0.12 182.5025);
@@ -179,9 +179,14 @@ body {
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
+}
+
+.dark body {
+  background-image: radial-gradient(circle at 50% 0%, oklch(0.25 0.03 258.2 / 0.25), transparent 70%);
 }
 
 .shimmer-ring {
@@ -196,22 +201,20 @@ body {
   inset: 0;
   border-radius: inherit;
   padding: 2px;
-  background: linear-gradient(
-    100deg,
-    rgba(255, 255, 255, 0),
-    rgba(255, 255, 255, 0.8),
-    rgba(255, 255, 255, 0)
-  );
+  background: linear-gradient(100deg,
+      rgba(255, 255, 255, 0),
+      rgba(255, 255, 255, 0.8),
+      rgba(255, 255, 255, 0));
   background-size: 230% 100%;
   animation: shimmerSweep var(--shimmer-speed, 2.8s) ease-in-out infinite;
   -webkit-mask:
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
-          mask:
+  mask:
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);
-          mask-composite: exclude;
+  mask-composite: exclude;
   opacity: 0.75;
   pointer-events: none;
 }
@@ -221,7 +224,7 @@ body {
   opacity: 0.35;
 }
 
-.shimmer-ring > * {
+.shimmer-ring>* {
   position: relative;
   border-radius: calc(var(--shimmer-radius, 1.25rem) - 4px);
   background-clip: padding-box;
@@ -232,6 +235,7 @@ body {
   0% {
     background-position: -150% 0;
   }
+
   100% {
     background-position: 150% 0;
   }
