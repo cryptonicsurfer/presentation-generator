@@ -9,27 +9,7 @@ export function FalconSpinner() {
   useEffect(() => {
     if (!containerRef.current) return;
 
-    // Load Three.js and GSAP dynamically
-    const loadScripts = async () => {
-      // Check if scripts are already loaded
-      if (!(window as any).THREE) {
-        const threeScript = document.createElement('script');
-        threeScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
-        document.head.appendChild(threeScript);
-        await new Promise(resolve => { threeScript.onload = resolve; });
-      }
-
-      if (!(window as any).gsap) {
-        const gsapScript = document.createElement('script');
-        gsapScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js';
-        document.head.appendChild(gsapScript);
-        await new Promise(resolve => { gsapScript.onload = resolve; });
-      }
-
-      // Initialize the spinner
-      initSpinner();
-    };
-
+    // Define initSpinner first (before loadScripts uses it)
     const initSpinner = () => {
       const THREE = (window as any).THREE;
       const gsap = (window as any).gsap;
@@ -88,14 +68,14 @@ export function FalconSpinner() {
       const geometry = new THREE.BoxGeometry(CUBE_SIZE, CUBE_SIZE, CUBE_SIZE);
 
       // Body Color Options (uncomment one):
-      const materialBody = new THREE.MeshBasicMaterial({ color: 0x000000 }); // Pure Black (default)
-      // const materialBody = new THREE.MeshBasicMaterial({ color: 0x1f4e99 }); // Falkenberg Kommunblå
+      // const materialBody = new THREE.MeshBasicMaterial({ color: 0x000000 }); // Pure Black (default)
+      const materialBody = new THREE.MeshBasicMaterial({ color: 0x1f4e99 }); // Falkenberg Kommunblå
       // const materialBody = new THREE.MeshBasicMaterial({ color: 0x414042 }); // Dark Gray (mörkgrå)
 
       // Edge Color Options (uncomment one):
-      const materialEdges = new THREE.LineBasicMaterial({ color: 0xaaaaaa }); // Light Gray (default)
+      // const materialEdges = new THREE.LineBasicMaterial({ color: 0xaaaaaa }); // Light Gray (default)
       // const materialEdges = new THREE.LineBasicMaterial({ color: 0xffffff }); // White
-      // const materialEdges = new THREE.LineBasicMaterial({ color: 0x86cedf }); // Falkenberg Himmelsblå
+      const materialEdges = new THREE.LineBasicMaterial({ color: 0x86cedf }); // Falkenberg Himmelsblå
 
       const voxels: any[] = [];
       const rows = PIXEL_MAP.length;
@@ -212,6 +192,27 @@ export function FalconSpinner() {
         }
         renderer.dispose();
       };
+    };
+
+    // Load Three.js and GSAP dynamically, then initialize
+    const loadScripts = async () => {
+      // Check if scripts are already loaded
+      if (!(window as any).THREE) {
+        const threeScript = document.createElement('script');
+        threeScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+        document.head.appendChild(threeScript);
+        await new Promise(resolve => { threeScript.onload = resolve; });
+      }
+
+      if (!(window as any).gsap) {
+        const gsapScript = document.createElement('script');
+        gsapScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js';
+        document.head.appendChild(gsapScript);
+        await new Promise(resolve => { gsapScript.onload = resolve; });
+      }
+
+      // Initialize the spinner after scripts are loaded
+      initSpinner();
     };
 
     loadScripts();
