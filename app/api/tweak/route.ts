@@ -107,7 +107,6 @@ export async function POST(req: NextRequest) {
         };
 
         // Run Gemini agent with callbacks (including screenshots for visual context)
-        const lastUserMessage = history[history.length - 1].content;
         const { result, toolCallsLog, usage } = await agent.run(lastUserMessage, (message) => {
           if (message.type === 'tool' && message.tool) {
             const toolMessage = toolMessages[message.tool] || 'Hämtar data...';

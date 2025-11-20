@@ -12,6 +12,7 @@ import type { ModelInfo } from '@/app/api/models/route';
 import { formatCost, calculateCost } from '@/lib/pricing';
 import { ChatInterface, type Message } from './chat-interface';
 import { SlideSelector } from './slide-selector';
+import { FalconSpinner } from './falcon-spinner';
 import { extractSlides, deleteSlides, renumberSlides, type Slide } from '@/lib/presentation/slide-parser';
 
 type StatusUpdate = {
@@ -675,7 +676,11 @@ export default function PresentationGenerator() {
   };
 
   return (
-    <div className="h-[calc(100vh-4rem)] p-4 md:p-6 lg:p-8 transition-colors bg-gradient-to-br from-blue-50 via-white to-green-50 dark:from-slate-950 dark:via-[#050b18] dark:to-[#041022] overflow-hidden">
+    <>
+      {/* Falcon Spinner Overlay */}
+      {isGenerating && <FalconSpinner />}
+
+      <div className="h-[calc(100vh-4rem)] p-4 md:p-6 lg:p-8 transition-colors bg-gradient-to-br from-blue-50 via-white to-green-50 dark:from-slate-950 dark:via-[#050b18] dark:to-[#041022] overflow-hidden">
       <div className="max-w-[1800px] mx-auto h-full">
         <div className="grid grid-cols-1 xl:grid-cols-5 gap-8 h-full">
           {/* Left Column: Input/Chat + Status */}
@@ -992,5 +997,6 @@ export default function PresentationGenerator() {
         </div>
       </div>
     </div>
+    </>
   );
 }
