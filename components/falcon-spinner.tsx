@@ -86,8 +86,16 @@ export function FalconSpinner() {
 
       // Materials
       const geometry = new THREE.BoxGeometry(CUBE_SIZE, CUBE_SIZE, CUBE_SIZE);
-      const materialBody = new THREE.MeshBasicMaterial({ color: 0x000000 });
-      const materialEdges = new THREE.LineBasicMaterial({ color: 0xaaaaaa });
+
+      // Body Color Options (uncomment one):
+      const materialBody = new THREE.MeshBasicMaterial({ color: 0x000000 }); // Pure Black (default)
+      // const materialBody = new THREE.MeshBasicMaterial({ color: 0x1f4e99 }); // Falkenberg Kommunblå
+      // const materialBody = new THREE.MeshBasicMaterial({ color: 0x414042 }); // Dark Gray (mörkgrå)
+
+      // Edge Color Options (uncomment one):
+      const materialEdges = new THREE.LineBasicMaterial({ color: 0xaaaaaa }); // Light Gray (default)
+      // const materialEdges = new THREE.LineBasicMaterial({ color: 0xffffff }); // White
+      // const materialEdges = new THREE.LineBasicMaterial({ color: 0x86cedf }); // Falkenberg Himmelsblå
 
       const voxels: any[] = [];
       const rows = PIXEL_MAP.length;
