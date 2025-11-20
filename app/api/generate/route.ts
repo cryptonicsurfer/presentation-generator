@@ -199,15 +199,34 @@ async function generateWithGemini(
       }
 
       presentationTitle = presentationData.title || userPrompt;
+
+      // Extract and validate sections - handle both string format and object format
+      const validSections = (presentationData.sections || [])
+        .map((section: any, index: number) => {
+          // If section is already a string, use it
+          if (typeof section === 'string') {
+            return section;
+          }
+          // If section is an object with 'slide' property, extract it
+          if (typeof section === 'object' && section.slide && typeof section.slide === 'string') {
+            console.log(`[Generate] Section ${index} is object with slide property, extracting...`);
+            return section.slide;
+          }
+          // Invalid format
+          console.error(`[Generate] Section ${index} has invalid format! Type: ${typeof section}`, section);
+          return null;
+        })
+        .filter((section: any) => section !== null);
+
       sections = [
         generateTitleSlide(presentationTitle),
-        ...(presentationData.sections || []),
+        ...validSections,
         generateThankYouSlide(),
       ];
 
       controller.enqueue(encoder.encode(`data: ${JSON.stringify({
         type: 'status',
-        message: `Skapade ${presentationData.sections?.length || 0} slides från Gemini!`
+        message: `Skapade ${validSections.length} slides från Gemini!`
       })}\n\n`));
     } else {
       // No JSON pattern found

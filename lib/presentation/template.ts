@@ -4,15 +4,40 @@ import { injectLogos } from './logos';
  * Generate the base HTML template for presentations
  */
 export function generatePresentationHTML(title: string, sections: string[]): string {
-  // AGGRESSIVELY remove ALL <script> tags from Claude-generated sections
+  // Remove DANGEROUS script tags but ALLOW Chart.js initialization
   let totalScriptsRemoved = 0;
   const cleanedSections = sections.map((section, index) => {
+    // Safety check: ensure section is a string
+    if (typeof section !== 'string') {
+      console.error(`[Template] Section ${index} is not a string! Type: ${typeof section}`, section);
+      return String(section); // Convert to string as fallback
+    }
+
     const before = section.length;
 
     let cleaned = section;
-    cleaned = cleaned.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-    cleaned = cleaned.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
-    cleaned = cleaned.replace(/<script[\s\S]*?<\/script>/gi, '');
+
+    // Only remove scripts that DON'T contain Chart.js code
+    // Keep scripts that create charts
+    const scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
+    let chartScriptsKept = 0;
+    let otherScriptsRemoved = 0;
+
+    cleaned = cleaned.replace(scriptRegex, (match, content) => {
+      // Keep Chart.js initialization scripts
+      if (content.includes('new Chart(') || content.includes('Chart.register')) {
+        chartScriptsKept++;
+        console.log(`[Template] Section ${index}: Keeping Chart.js script (${content.length} chars)`);
+        return match;
+      }
+      // Remove everything else
+      otherScriptsRemoved++;
+      return '';
+    });
+
+    if (chartScriptsKept > 0) {
+      console.log(`[Template] Section ${index}: Kept ${chartScriptsKept} Chart.js scripts, removed ${otherScriptsRemoved} other scripts`);
+    }
 
     // Inject unique ID if not present
     // We use index + 1 because title slide will be slide-0 (or we can make title slide slide-1)
@@ -43,6 +68,7 @@ export function generatePresentationHTML(title: string, sections: string[]): str
     <!-- Script tags removed from ${totalScriptsRemoved} sections to prevent conflicts -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;800&family=Lato:wght@300;400&display=swap" rel="stylesheet">

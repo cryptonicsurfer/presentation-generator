@@ -272,11 +272,221 @@ Use these Falkenberg-styled templates:
 </section>
 \`\`\`
 
+# Chart.js Integration (NEW!)
+
+**You now have Chart.js 4.4.1 available!** Create professional, interactive charts instead of fake CSS charts.
+
+## Chart.js Basics
+
+**Available chart types:**
+- bar - Bar charts (vertical or horizontal)
+- line - Line charts with trends
+- pie - Pie charts
+- doughnut - Doughnut charts
+- radar - Radar charts
+
+**How to create a chart:**
+
+1. Add a canvas element with a unique ID
+2. Add a script tag that creates the chart
+3. Use Falkenberg color palette
+
+## Chart.js Example - Bar Chart
+
+\`\`\`html
+<div class="w-full max-w-2xl">
+    <canvas id="chart-revenue-trend"></canvas>
+</div>
+
+<script>
+const ctx = document.getElementById('chart-revenue-trend').getContext('2d');
+new Chart(ctx, {
+    type: 'bar',
+    data: {
+        labels: ['2020', '2021', '2022', '2023', '2024'],
+        datasets: [{
+            label: 'Omsättning (Mkr)',
+            data: [45.2, 52.1, 58.3, 61.9, 67.4],
+            backgroundColor: '#1f4e99', // falkenberg-kommunblå
+            borderColor: '#1f4e99',
+            borderWidth: 0,
+            borderRadius: 8,
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            legend: { display: false },
+            title: { display: false }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    font: { size: 14, family: 'Lato' },
+                    color: '#414042'
+                },
+                grid: { color: '#e6e7e8' }
+            },
+            x: {
+                ticks: {
+                    font: { size: 14, family: 'Lato' },
+                    color: '#414042'
+                },
+                grid: { display: false }
+            }
+        }
+    }
+});
+</script>
+\`\`\`
+
+## Stacked Bar Chart Example
+
+\`\`\`html
+<div class="w-full max-w-3xl">
+    <canvas id="chart-recruitment"></canvas>
+</div>
+
+<script>
+const ctx = document.getElementById('chart-recruitment').getContext('2d');
+new Chart(ctx, {
+    type: 'bar',
+    data: {
+        labels: ['2020', '2021', '2022', '2023', '2024'],
+        datasets: [
+            {
+                label: 'Ingenjör',
+                data: [3, 5, 8, 12, 7],
+                backgroundColor: '#f39200', // falkenberg-havtorn
+                borderRadius: 4,
+            },
+            {
+                label: 'Produktion',
+                data: [2, 3, 4, 5, 5],
+                backgroundColor: '#1f4e99', // falkenberg-kommunblå
+                borderRadius: 4,
+            },
+            {
+                label: 'Sälj',
+                data: [1, 2, 2, 2, 8],
+                backgroundColor: '#52ae32', // falkenberg-ängsgrön
+                borderRadius: 4,
+            },
+            {
+                label: 'Övrigt',
+                data: [1, 1, 1, 1, 2],
+                backgroundColor: '#e6e7e8', // falkenberg-ljusgrå
+                borderRadius: 4,
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        scales: {
+            x: { stacked: true, grid: { display: false } },
+            y: { stacked: true, beginAtZero: true, grid: { color: '#e6e7e8' } }
+        },
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: {
+                    font: { size: 12, family: 'Lato' },
+                    padding: 15,
+                    usePointStyle: true,
+                    pointStyle: 'circle'
+                }
+            }
+        }
+    }
+});
+</script>
+\`\`\`
+
+## Line Chart Example
+
+\`\`\`html
+<div class="w-full max-w-3xl">
+    <canvas id="chart-employees"></canvas>
+</div>
+
+<script>
+const ctx = document.getElementById('chart-employees').getContext('2d');
+new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: ['2020', '2021', '2022', '2023', '2024'],
+        datasets: [{
+            label: 'Antal anställda',
+            data: [82, 89, 95, 98, 105],
+            borderColor: '#52ae32', // falkenberg-ängsgrön
+            backgroundColor: 'rgba(82, 174, 50, 0.1)',
+            borderWidth: 3,
+            tension: 0.4,
+            fill: true,
+            pointRadius: 6,
+            pointBackgroundColor: '#52ae32',
+            pointBorderColor: '#fff',
+            pointBorderWidth: 2,
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            legend: { display: false }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    font: { size: 14, family: 'Lato' },
+                    color: '#414042'
+                },
+                grid: { color: '#e6e7e8' }
+            },
+            x: {
+                ticks: {
+                    font: { size: 14, family: 'Lato' },
+                    color: '#414042'
+                },
+                grid: { display: false }
+            }
+        }
+    }
+});
+</script>
+\`\`\`
+
+## Falkenberg Color Palette for Charts
+
+Use these colors for a professional, brand-consistent look:
+
+- **Primary**: #1f4e99 (kommunblå)
+- **Success**: #52ae32 (ängsgrön)
+- **Accent**: #f39200 (havtorn)
+- **Warning**: #ab0d1f (vinbär)
+- **Neutral**: #e6e7e8 (ljusgrå)
+- **Text**: #414042 (mörkgrå)
+
+**Multi-color datasets**: Use ['#f39200', '#1f4e99', '#52ae32', '#ab0d1f', '#e6e7e8']
+
+## IMPORTANT Chart.js Rules
+
+1. **Always use unique canvas IDs** (e.g., chart-revenue-1, chart-employees-2)
+2. **Place script AFTER canvas element**
+3. **Use script tags** (they won't be removed if they contain new Chart)
+4. **Set responsive: true** for proper sizing
+5. **Use Falkenberg colors** from the palette above
+6. **Swedish labels** in datasets and legends
+
 # Style Guidelines
 
 - **Language**: Swedish for all text
 - **Numbers**: Swedish format (1 234, 85%)
-- **Colors**: Use Falkenberg palette
+- **Colors**: Use Falkenberg palette (see Chart.js section)
   - kommunblå (#1f4e99) - primary
   - ängsgrön (#52ae32) - success
   - havtorn (#f39200) - accent
@@ -287,6 +497,7 @@ Use these Falkenberg-styled templates:
   - Always include in <img> tag: <img src="{{LOGO_SVART}}" alt="Falkenbergs kommun" class="slide-logo">
 - **Icons**: Use Lucide icons (data-lucide attribute)
 - **Missing data**: Show "Inga uppgifter tillgängliga"
+- **Charts**: Use Chart.js (see examples above) - NO MORE FAKE CSS CHARTS!
 
 # Output Format
 
@@ -334,12 +545,17 @@ BE THOROUGH! Use multiple queries, analyze trends, and create a comprehensive 10
 export async function generateGeminiTweakPrompt(
   history: { role: string; content: string }[],
   currentHTML: string,
-  originalTitle: string
+  originalTitle: string,
+  hasVisualContext: boolean = false
 ): Promise<string> {
   const lastUserMessage = history[history.length - 1]?.content || '';
   const previousContext = history.slice(0, -1).map(msg => `${msg.role.toUpperCase()}: ${msg.content}`).join('\n');
 
-  return `You are a presentation editing assistant. You help users modify an existing HTML presentation.
+  const visualContextNote = hasVisualContext
+    ? `\n\n**IMPORTANT: You have been provided with SCREENSHOTS of the relevant slides as visual context. Use these images to see exactly what the slides look like, including colors, layouts, charts, and visual elements. Reference the screenshots when making visual changes.**\n`
+    : '';
+
+  return `You are a presentation editing assistant. You help users modify an existing HTML presentation.${visualContextNote}
 
 # Conversation History
 ${previousContext}
@@ -408,6 +624,44 @@ You have access to these database tools if you need to fetch new data:
 5. **Tools**: Use database tools to fetch fresh data if needed
 6. **Slide IDs**: When adding new slides, assign sequential IDs (e.g., if last slide is slide-12, new ones are slide-13, slide-14)
 
+# Chart.js Support (IMPORTANT!)
+
+**You have Chart.js 4.4.1 available!** When users ask for charts, diagrams, or graphs:
+
+1. Use **real Chart.js charts** instead of CSS/HTML fake charts
+2. Add a canvas element with unique ID
+3. Add a script tag with Chart.js code (won't be removed)
+4. Use Falkenberg color palette
+
+**Quick Example - Bar Chart:**
+\`\`\`html
+<div class="w-full max-w-2xl">
+    <canvas id="chart-example-1"></canvas>
+</div>
+
+<script>
+const ctx = document.getElementById('chart-example-1').getContext('2d');
+new Chart(ctx, {
+    type: 'bar',
+    data: {
+        labels: ['2020', '2021', '2022', '2023'],
+        datasets: [{
+            label: 'Omsättning',
+            data: [45, 52, 58, 67],
+            backgroundColor: '#1f4e99',
+            borderRadius: 8
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: { y: { beginAtZero: true } }
+    }
+});
+</script>
+\`\`\`
+
+**Falkenberg Colors:** #1f4e99 (blå), #52ae32 (grön), #f39200 (orange), #ab0d1f (röd)
+
 # Slide Template for New Slides
 When adding new slides, follow this structure:
 
@@ -420,7 +674,7 @@ When adding new slides, follow this structure:
             <i data-lucide="bar-chart" class="w-12 h-12 text-falkenberg-kommunblå"></i>
             <h2 class="text-5xl font-bold text-gray-900">Slide Title</h2>
         </div>
-        <!-- Your content here -->
+        <!-- Your content here - USE CHART.JS FOR CHARTS! -->
     </div>
 </section>
 \`\`\`

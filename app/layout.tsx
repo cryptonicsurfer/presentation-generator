@@ -28,14 +28,16 @@ export default function RootLayout({
   return (
     <html lang="sv">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased h-screen overflow-hidden`}
       >
         <ThemeProvider>
           <AuthProvider>
-            <Navigation />
-            <main className="min-h-screen bg-gray-50">
-              {children}
-            </main>
+            <div className="h-full flex flex-col">
+              <Navigation />
+              <main className="flex-1 overflow-auto bg-gray-50">
+                {children}
+              </main>
+            </div>
           </AuthProvider>
         </ThemeProvider>
       </body>

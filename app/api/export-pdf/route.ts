@@ -65,7 +65,58 @@ export async function POST(request: NextRequest) {
     });
 
     // Wait for fonts and images to load
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(1000);
+
+    // Wait for Chart.js to initialize and disable animations for PDF
+    const chartInfo = await page.evaluate(() => {
+      return new Promise<{ hasChartJS: boolean; canvasCount: number; chartsUpdated: number }>((resolve) => {
+        // Check if Chart.js is loaded
+        const hasChartJS = typeof (window as any).Chart !== 'undefined';
+
+        if (!hasChartJS) {
+          resolve({ hasChartJS: false, canvasCount: 0, chartsUpdated: 0 });
+          return;
+        }
+
+        // Disable animations globally for all charts
+        (window as any).Chart.defaults.animation = false;
+
+        // Find all canvas elements with Chart.js instances
+        const canvases = document.querySelectorAll('canvas');
+        const canvasCount = canvases.length;
+
+        if (canvasCount === 0) {
+          resolve({ hasChartJS: true, canvasCount: 0, chartsUpdated: 0 });
+          return;
+        }
+
+        // Wait for charts to initialize and then disable animations
+        setTimeout(() => {
+          let chartsUpdated = 0;
+
+          canvases.forEach((canvas) => {
+            try {
+              const chart = (window as any).Chart.getChart(canvas);
+              if (chart) {
+                // Update chart with animations disabled
+                chart.options.animation = false;
+                chart.update('none'); // 'none' mode = no animation
+                chartsUpdated++;
+              }
+            } catch (error) {
+              // Silently continue if chart update fails
+            }
+          });
+
+          resolve({ hasChartJS: true, canvasCount, chartsUpdated });
+        }, 4000); // Wait 4s for charts to initialize (INCREASED for testing)
+      });
+    });
+
+    console.log('[export-pdf] Chart.js status:', chartInfo);
+
+    // Additional wait to ensure charts are fully rendered without animation
+    await page.waitForTimeout(2000); // INCREASED to 2s for testing
 
     // Prepare for PDF export - show all slides and remove navigation
     await page.evaluate(() => {
@@ -78,6 +129,9 @@ export async function POST(request: NextRequest) {
         slide.classList.add('active');
       });
     });
+
+    console.log('[export-pdf] All slides visible, waiting for final render...');
+    await page.waitForTimeout(1000); // Extra wait after showing all slides
 
     console.log('[export-pdf] Generating PDF...');
 
@@ -96,11 +150,13 @@ export async function POST(request: NextRequest) {
     // Close browser
     await browser.close();
 
-    // Clean up temp file
-    if (tempHtmlPath) {
-      await unlink(tempHtmlPath);
-      console.log('[export-pdf] Temp file cleaned up');
-    }
+    // Clean up temp file - DISABLED for debugging
+    // TODO: Re-enable this after chart debugging
+    // if (tempHtmlPath) {
+    //   await unlink(tempHtmlPath);
+    //   console.log('[export-pdf] Temp file cleaned up');
+    // }
+    console.log('[export-pdf] Temp HTML saved for debugging:', tempHtmlPath);
 
     // Return PDF as download
     return new NextResponse(pdfBuffer, {
@@ -118,12 +174,17 @@ export async function POST(request: NextRequest) {
     if (browser) {
       await browser.close();
     }
+    // Keep temp file for debugging - DISABLED cleanup
+    // TODO: Re-enable this after chart debugging
+    // if (tempHtmlPath) {
+    //   try {
+    //     await unlink(tempHtmlPath);
+    //   } catch (unlinkError) {
+    //     console.error('[export-pdf] Failed to clean up temp file:', unlinkError);
+    //   }
+    // }
     if (tempHtmlPath) {
-      try {
-        await unlink(tempHtmlPath);
-      } catch (unlinkError) {
-        console.error('[export-pdf] Failed to clean up temp file:', unlinkError);
-      }
+      console.error('[export-pdf] Temp HTML saved for debugging:', tempHtmlPath);
     }
 
     return NextResponse.json(

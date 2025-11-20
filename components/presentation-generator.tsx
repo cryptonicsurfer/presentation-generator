@@ -78,7 +78,9 @@ export default function PresentationGenerator() {
   const [selectedSlideIds, setSelectedSlideIds] = useState<string[]>([]);
   const [thinkingLevel, setThinkingLevel] = useState<'low' | 'high' | 'off'>('off');
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [pdfProgress, setPdfProgress] = useState(0);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const examplePrompts = [
     'Skapa en företagsrapport för Randek AB',
@@ -250,6 +252,24 @@ export default function PresentationGenerator() {
     if (!generatedHTML) return;
 
     setIsGeneratingPDF(true);
+    setPdfProgress(0);
+
+    // Start progress animation (10 seconds total)
+    const duration = 10000; // 10 seconds
+    const steps = 100;
+    const stepDuration = duration / steps;
+
+    progressIntervalRef.current = setInterval(() => {
+      setPdfProgress((prev) => {
+        if (prev >= 100) {
+          if (progressIntervalRef.current) {
+            clearInterval(progressIntervalRef.current);
+          }
+          return 100;
+        }
+        return prev + 1;
+      });
+    }, stepDuration);
 
     try {
       console.log('[PDF Export] Starting PDF generation...');
@@ -292,7 +312,13 @@ export default function PresentationGenerator() {
       console.error('[PDF Export] Error:', error);
       alert(`PDF-generering misslyckades: ${error instanceof Error ? error.message : 'Okänt fel'}`);
     } finally {
+      // Clear progress interval
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
       setIsGeneratingPDF(false);
+      setPdfProgress(0);
     }
   };
 
@@ -516,7 +542,7 @@ export default function PresentationGenerator() {
   };
 
   return (
-    <div className="min-h-screen p-8 transition-colors bg-gradient-to-br from-blue-50 via-white to-green-50 dark:from-slate-950 dark:via-[#050b18] dark:to-[#041022]">
+    <div className="h-full p-8 transition-colors bg-gradient-to-br from-blue-50 via-white to-green-50 dark:from-slate-950 dark:via-[#050b18] dark:to-[#041022]">
       <div className="max-w-[1800px] mx-auto">
         <div className="grid grid-cols-1 xl:grid-cols-5 gap-8">
           {/* Left Column: Input/Chat + Status */}
@@ -533,118 +559,118 @@ export default function PresentationGenerator() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                  {/* Model Selector */}
-                  <div className="flex gap-4">
-                    {/* AI Model Selector */}
-                    <div className="space-y-2 flex-1">
-                      <label className="text-sm font-medium text-foreground/80 dark:text-foreground">
-                        AI-modell
-                      </label>
-                      <Select
-                        value={selectedModel}
-                        onValueChange={setSelectedModel}
-                        disabled={isGenerating || availableModels.length === 0}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Välj AI-modell" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableModels.map((model) => (
-                            <SelectItem key={model.id} value={model.id}>
-                              <div className="flex flex-col items-start">
-                                <span className="font-medium">{model.name}</span>
-                                <span className="text-xs text-muted-foreground">{model.description}</span>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Thinking Level Selector - only for Gemini 3 Pro Preview */}
-                    {selectedModel === 'gemini-3-pro-preview' && (
+                    {/* Model Selector */}
+                    <div className="flex gap-4">
+                      {/* AI Model Selector */}
                       <div className="space-y-2 flex-1">
-                        <label className="text-sm font-medium text-foreground/80 dark:text-foreground flex items-center gap-2">
-                          <Sparkles className="w-4 h-4" />
-                          Thinking Mode
+                        <label className="text-sm font-medium text-foreground/80 dark:text-foreground">
+                          AI-modell
                         </label>
                         <Select
-                          value={thinkingLevel}
-                          onValueChange={(value) => setThinkingLevel(value as 'low' | 'high' | 'off')}
-                          disabled={isGenerating}
+                          value={selectedModel}
+                          onValueChange={setSelectedModel}
+                          disabled={isGenerating || availableModels.length === 0}
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Välj thinking level" />
+                            <SelectValue placeholder="Välj AI-modell" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="off">
-                              <div className="flex flex-col items-start">
-                                <span className="font-medium">Off</span>
-                                <span className="text-xs text-muted-foreground">Standard generation (no thinking)</span>
-                              </div>
-                            </SelectItem>
-                            <SelectItem value="low">
-                              <div className="flex flex-col items-start">
-                                <span className="font-medium">Low</span>
-                                <span className="text-xs text-muted-foreground">Basic reasoning steps</span>
-                              </div>
-                            </SelectItem>
-                            <SelectItem value="high">
-                              <div className="flex flex-col items-start">
-                                <span className="font-medium">High</span>
-                                <span className="text-xs text-muted-foreground">Detailed thought process</span>
-                              </div>
-                            </SelectItem>
+                            {availableModels.map((model) => (
+                              <SelectItem key={model.id} value={model.id}>
+                                <div className="flex flex-col items-start">
+                                  <span className="font-medium">{model.name}</span>
+                                  <span className="text-xs text-muted-foreground">{model.description}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>
-                    )}
-                  </div>
 
-                  <Textarea
-                    placeholder="Exempel: Skapa en företagsrapport för Randek AB med senaste finansiella data och möteshistorik..."
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    rows={6}
-                    className="resize-none"
-                    disabled={isGenerating}
-                  />
-
-                  <div className="space-y-2">
-                    <p className="text-sm text-muted-foreground">Exempel på prompts:</p>
-                    <div className="flex flex-wrap gap-2">
-                      {examplePrompts.map((example, i) => (
-                        <Button
-                          key={i}
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setPrompt(example)}
-                          disabled={isGenerating}
-                          className="line-clamp-2"
-                        >
-                          {example}
-                        </Button>
-                      ))}
+                      {/* Thinking Level Selector - only for Gemini 3 Pro Preview */}
+                      {selectedModel === 'gemini-3-pro-preview' && (
+                        <div className="space-y-2 flex-1">
+                          <label className="text-sm font-medium text-foreground/80 dark:text-foreground flex items-center gap-2">
+                            <Sparkles className="w-4 h-4" />
+                            Thinking Mode
+                          </label>
+                          <Select
+                            value={thinkingLevel}
+                            onValueChange={(value) => setThinkingLevel(value as 'low' | 'high' | 'off')}
+                            disabled={isGenerating}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Välj thinking level" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="off">
+                                <div className="flex flex-col items-start">
+                                  <span className="font-medium">Off</span>
+                                  <span className="text-xs text-muted-foreground">Standard generation (no thinking)</span>
+                                </div>
+                              </SelectItem>
+                              <SelectItem value="low">
+                                <div className="flex flex-col items-start">
+                                  <span className="font-medium">Low</span>
+                                  <span className="text-xs text-muted-foreground">Basic reasoning steps</span>
+                                </div>
+                              </SelectItem>
+                              <SelectItem value="high">
+                                <div className="flex flex-col items-start">
+                                  <span className="font-medium">High</span>
+                                  <span className="text-xs text-muted-foreground">Detailed thought process</span>
+                                </div>
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
                     </div>
-                  </div>
 
-                  <Button
-                    onClick={handleGenerate}
-                    disabled={isGenerating || !prompt.trim()}
-                    className="w-full"
-                    size="lg"
-                  >
-                    {isGenerating ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Genererar...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-4 h-4" />
-                        Generera Presentation
-                      </>
-                    )}
+                    <Textarea
+                      placeholder="Exempel: Skapa en företagsrapport för Randek AB med senaste finansiella data och möteshistorik..."
+                      value={prompt}
+                      onChange={(e) => setPrompt(e.target.value)}
+                      rows={6}
+                      className="resize-none"
+                      disabled={isGenerating}
+                    />
+
+                    <div className="space-y-2">
+                      <p className="text-sm text-muted-foreground">Exempel på prompts:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {examplePrompts.map((example, i) => (
+                          <Button
+                            key={i}
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPrompt(example)}
+                            disabled={isGenerating}
+                            className="line-clamp-2"
+                          >
+                            {example}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <Button
+                      onClick={handleGenerate}
+                      disabled={isGenerating || !prompt.trim()}
+                      className="w-full"
+                      size="lg"
+                    >
+                      {isGenerating ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Genererar...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4" />
+                          Generera Presentation
+                        </>
+                      )}
                     </Button>
                   </CardContent>
                 </Card>
@@ -736,31 +762,29 @@ export default function PresentationGenerator() {
                 <CardContent className="space-y-4">
                   {generatedHTML ? (
                     <>
-                      <div className="space-y-2">
-                        <div className="flex gap-2">
-                          <Button onClick={handlePreview} variant="outline" className="flex-1">
-                            <Eye className="w-4 h-4" />
-                            Visa
-                          </Button>
-                          <Button onClick={handleFullscreen} variant="outline" className="flex-1">
-                            <Maximize2 className="w-4 h-4" />
-                            Fullscreen
-                          </Button>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button onClick={handleDownload} variant="outline" className="flex-1">
-                            <Download className="w-4 h-4" />
-                            HTML
-                          </Button>
-                          <Button
-                            onClick={handleDownloadPDF}
-                            className="flex-1"
-                            disabled={isGeneratingPDF}
-                          >
+                      <div className="flex gap-2">
+                        <Button onClick={handleFullscreen} variant="outline" className="flex-1">
+                          <Maximize2 className="w-4 h-4" />
+                          Fullscreen
+                        </Button>
+                        <Button onClick={handleDownload} variant="outline" className="flex-1">
+                          <Download className="w-4 h-4" />
+                          HTML
+                        </Button>
+                        <Button
+                          onClick={handleDownloadPDF}
+                          className="flex-1 relative overflow-hidden hover:bg-primary/70"
+                          disabled={isGeneratingPDF}
+                          style={isGeneratingPDF ? {
+                            background: `linear-gradient(to right, #16a34a ${pdfProgress}%, #1f2937 ${pdfProgress}%)`,
+                            transition: 'background 0.1s linear'
+                          } : undefined}
+                        >
+                          <span className="relative z-10 flex items-center gap-2">
                             {isGeneratingPDF ? (
                               <>
                                 <Loader2 className="w-4 h-4 animate-spin" />
-                                Genererar PDF...
+                                Genererar PDF... {pdfProgress}%
                               </>
                             ) : (
                               <>
@@ -768,8 +792,8 @@ export default function PresentationGenerator() {
                                 Ladda ner PDF
                               </>
                             )}
-                          </Button>
-                        </div>
+                          </span>
+                        </Button>
                       </div>
                       {/* 
                     {toolCallsLogUrl && (
