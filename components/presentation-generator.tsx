@@ -83,6 +83,7 @@ export default function PresentationGenerator() {
   const [pdfProgress, setPdfProgress] = useState(0);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const statusScrollRef = useRef<HTMLDivElement>(null);
 
   const examplePrompts = [
     'Skapa en företagsrapport för Randek AB',
@@ -446,6 +447,13 @@ export default function PresentationGenerator() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [generatedHTML]);
+
+  // Auto-scroll status updates to bottom when new updates arrive
+  useEffect(() => {
+    if (statusScrollRef.current) {
+      statusScrollRef.current.scrollTop = statusScrollRef.current.scrollHeight;
+    }
+  }, [statusUpdates]);
 
   const handleFullscreen = () => {
     if (!iframeRef.current) return;
@@ -848,7 +856,7 @@ export default function PresentationGenerator() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="flex-1 overflow-hidden p-0">
-                    <div className="h-full overflow-y-auto p-6 space-y-3">
+                    <div ref={statusScrollRef} className="h-full overflow-y-auto p-6 space-y-3">
                       {statusUpdates.map((update, i) => (
                         <div key={i} className="flex items-start gap-3">
                           {update.type === 'status' && (
