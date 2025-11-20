@@ -38,19 +38,20 @@ type ShimmerContainerProps = {
   active?: boolean;
   radius?: string;
   className?: string;
+  wrapperClassName?: string;
   children: ReactNode;
 };
 
-function ShimmerContainer({ active, radius = '1.5rem', className, children }: ShimmerContainerProps) {
+function ShimmerContainer({ active, radius = '1.5rem', className, wrapperClassName, children }: ShimmerContainerProps) {
   if (!active) {
-    if (className) {
-      return <div className={className}>{children}</div>;
+    if (className || wrapperClassName) {
+      return <div className={`${wrapperClassName || ''} ${className || ''}`.trim()}>{children}</div>;
     }
     return <>{children}</>;
   }
 
   return (
-    <div className="shimmer-border-wrapper" style={{ '--shimmer-radius': radius, padding: '3px' } as CSSProperties}>
+    <div className={`shimmer-border-wrapper ${wrapperClassName || ''}`.trim()} style={{ '--shimmer-radius': radius, padding: '3px' } as CSSProperties}>
       <div className="shimmer-border-bg">
         <div className="shimmer-gradient-rotate" />
       </div>
@@ -335,11 +336,6 @@ export default function PresentationGenerator() {
       // We force scrollbars to prevent jitter/resize loops with Chart.js
       const scalingCSS = `
         <style>
-          /* Force scrollbar to prevent layout jumps that trigger Chart.js resize loops */
-          html {
-            overflow-y: scroll;
-          }
-          
           body {
             margin: 0;
             padding: 0;
@@ -389,12 +385,46 @@ export default function PresentationGenerator() {
         htmlWithWrapper = scalingCSS + htmlWithWrapper;
       }
 
-      // Wrap body content in #presentation-wrapper
+      /* Script to force Chart.js resize on fullscreen toggle */
+      const resizeScript = `
+        <script>
+          (function() {
+            function forceChartResize() {
+              if (window.Chart && window.Chart.instances) {
+                Object.values(window.Chart.instances).forEach(chart => {
+                  chart.resize();
+                });
+              }
+            }
+
+            // Resize on window resize
+            window.addEventListener('resize', () => {
+              clearTimeout(window.resizeTimer);
+              window.resizeTimer = setTimeout(forceChartResize, 100);
+            });
+
+            // Resize on fullscreen toggle (body class change)
+            const observer = new MutationObserver((mutations) => {
+              mutations.forEach((mutation) => {
+                if (mutation.attributeName === 'class') {
+                  // Trigger resize immediately and after transition
+                  forceChartResize();
+                  setTimeout(forceChartResize, 300);
+                }
+              });
+            });
+
+            observer.observe(document.body, { attributes: true });
+          })();
+        </script>
+      `;
+
+      // Wrap body content in #presentation-wrapper and inject script
       if (htmlWithWrapper.includes('<body')) {
         htmlWithWrapper = htmlWithWrapper.replace(/<body([^>]*)>/i, '<body$1><div id="presentation-wrapper">');
-        htmlWithWrapper = htmlWithWrapper.replace('</body>', '</div></body>');
+        htmlWithWrapper = htmlWithWrapper.replace('</body>', '</div>' + resizeScript + '</body>');
       } else {
-        htmlWithWrapper = `<div id="presentation-wrapper">${htmlWithWrapper}</div>`;
+        htmlWithWrapper = `<div id="presentation-wrapper">${htmlWithWrapper}</div>${resizeScript}`;
       }
 
       doc.write(htmlWithWrapper);
@@ -596,15 +626,16 @@ export default function PresentationGenerator() {
                       }
                       // Accumulate usage data and calculate total cost
                       if (data.usage) {
+                        const usage = data.usage;
                         const newCost = calculateCost(
                           selectedModel,
-                          data.usage.inputTokens,
-                          data.usage.outputTokens
+                          usage.inputTokens,
+                          usage.outputTokens
                         );
                         setUsageData(prev => ({
-                          inputTokens: (prev?.inputTokens || 0) + data.usage.inputTokens,
-                          outputTokens: (prev?.outputTokens || 0) + data.usage.outputTokens,
-                          totalTokens: (prev?.totalTokens || 0) + data.usage.totalTokens,
+                          inputTokens: (prev?.inputTokens || 0) + usage.inputTokens,
+                          outputTokens: (prev?.outputTokens || 0) + usage.outputTokens,
+                          totalTokens: (prev?.totalTokens || 0) + usage.totalTokens,
                           cost: (prev?.cost || 0) + newCost
                         }));
                       }
@@ -644,11 +675,11 @@ export default function PresentationGenerator() {
   };
 
   return (
-    <div className="h-full p-8 transition-colors bg-gradient-to-br from-blue-50 via-white to-green-50 dark:from-slate-950 dark:via-[#050b18] dark:to-[#041022]">
-      <div className="max-w-[1800px] mx-auto">
-        <div className="grid grid-cols-1 xl:grid-cols-5 gap-8">
+    <div className="h-[calc(100vh-4rem)] p-4 md:p-6 lg:p-8 transition-colors bg-gradient-to-br from-blue-50 via-white to-green-50 dark:from-slate-950 dark:via-[#050b18] dark:to-[#041022] overflow-hidden">
+      <div className="max-w-[1800px] mx-auto h-full">
+        <div className="grid grid-cols-1 xl:grid-cols-5 gap-8 h-full">
           {/* Left Column: Input/Chat + Status */}
-          <div className="xl:col-span-2 space-y-6">
+          <div className="xl:col-span-2 flex flex-col gap-6 h-full overflow-hidden">
             {/* Top-left: Prompt Input OR Chat Interface */}
             {!generatedHTML ? (
               /* STEP 1: Initial Prompt Input */
@@ -803,16 +834,16 @@ export default function PresentationGenerator() {
 
             {/* Status Updates */}
             {statusUpdates.length > 0 && (
-              <ShimmerContainer active={shouldHighlightStatus}>
-                <Card>
+              <ShimmerContainer active={shouldHighlightStatus} wrapperClassName="flex-1 min-h-0 flex flex-col" className="h-full">
+                <Card className="h-full flex flex-col">
                   <CardHeader>
                     <CardTitle>Status</CardTitle>
                     <CardDescription>
                       {availableModels.find(m => m.id === selectedModel)?.name || 'AI-modellen'} arbetar med din presentation
                     </CardDescription>
                   </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3 max-h-48 overflow-y-auto">
+                  <CardContent className="flex-1 overflow-hidden p-0">
+                    <div className="h-full overflow-y-auto p-6 space-y-3">
                       {statusUpdates.map((update, i) => (
                         <div key={i} className="flex items-start gap-3">
                           {update.type === 'status' && (
@@ -841,10 +872,10 @@ export default function PresentationGenerator() {
           </div>
 
           {/* Right Column: Preview */}
-          <div className="xl:col-span-3">
-            <ShimmerContainer active={shouldHighlightPreview} radius="1.75rem">
-              <Card className="h-full">
-                <CardHeader>
+          <div className="xl:col-span-3 h-full overflow-hidden">
+            <ShimmerContainer active={shouldHighlightPreview} radius="1.75rem" className="h-full">
+              <Card className="h-full flex flex-col">
+                <CardHeader className="shrink-0">
                   <CardTitle>Förhandsvisning</CardTitle>
                   <CardDescription>
                     {generatedHTML ? (
@@ -861,7 +892,7 @@ export default function PresentationGenerator() {
                     )}
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-4 flex-1 overflow-y-auto min-h-0">
                   {generatedHTML ? (
                     <>
                       <div className="flex gap-2">

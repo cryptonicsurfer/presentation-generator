@@ -128,101 +128,109 @@ export function SlideSelector({
       </div>
 
       {/* Horizontal carousel with navigation arrows */}
-      <div className="relative group">
-        {/* Left arrow */}
+      <div className="flex items-center gap-2">
+        {/* Left arrow - Static position */}
         <Button
           variant="ghost"
-          size="sm"
-          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 h-24 w-10 rounded-r-lg bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+          size="icon"
+          className="h-12 w-8 rounded-lg hover:bg-accent hover:text-accent-foreground shrink-0"
           onClick={() => scroll('left')}
         >
           <ChevronLeft className="w-6 h-6" />
         </Button>
 
-        {/* Right arrow */}
+        {/* Scrollable container wrapper */}
+        <div className="relative flex-1 overflow-hidden group">
+          {/* Gradient fade-out on left - constrained height to avoid checkboxes */}
+          <div className="absolute left-0 top-0 h-[110px] w-12 bg-gradient-to-r from-background via-background/80 to-transparent z-10 pointer-events-none" />
+
+          {/* Gradient fade-out on right - constrained height to avoid checkboxes */}
+          <div className="absolute right-0 top-0 h-[110px] w-12 bg-gradient-to-l from-background via-background/80 to-transparent z-10 pointer-events-none" />
+
+          {/* Scrollable container with drag */}
+          <div
+            ref={scrollContainerRef}
+            className="flex gap-3 overflow-x-auto pb-4 px-4 scroll-smooth snap-x snap-mandatory hide-scrollbar cursor-grab active:cursor-grabbing"
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseLeave}
+          >
+            {allSlides.map((slide) => {
+              const isSelected = selectedSlideIds.includes(slide.id);
+              const isHovered = hoveredSlide === slide.id;
+
+              return (
+                <div
+                  key={slide.id}
+                  className="flex-shrink-0 snap-start"
+                  onMouseEnter={() => setHoveredSlide(slide.id)}
+                  onMouseLeave={() => setHoveredSlide(null)}
+                >
+                  {/* Thumbnail with overlay */}
+                  <div
+                    className={`relative cursor-pointer transition-all ${isSelected ? 'ring-4 ring-primary ring-offset-2' : ''
+                      } ${isHovered ? 'scale-105' : ''}`}
+                    onClick={() => handleToggleSlide(slide.id)}
+                  >
+                    {/* Real thumbnail using SlideThumbnail component */}
+                    <SlideThumbnail
+                      slide={slide}
+                      fullHtml={fullHtml}
+                      width={180}
+                      height={101}
+                    />
+
+                    {/* Selection overlay */}
+                    {isSelected && (
+                      <div className="absolute inset-0 bg-primary/20 rounded-lg pointer-events-none flex items-center justify-center">
+                        <div className="bg-primary text-primary-foreground rounded-full p-2">
+                          <CheckSquare className="w-5 h-5" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Checkbox below thumbnail */}
+                  <div className="mt-2 flex items-center justify-center gap-2">
+                    <Checkbox
+                      id={`checkbox-${slide.id}`}
+                      checked={isSelected}
+                      onCheckedChange={() => handleToggleSlide(slide.id)}
+                    />
+                    <label
+                      htmlFor={`checkbox-${slide.id}`}
+                      className="text-xs font-medium cursor-pointer"
+                    >
+                      Slide {slide.index + 1}
+                    </label>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Custom scrollbar hide */}
+          <style jsx>{`
+            .hide-scrollbar {
+              -ms-overflow-style: none;
+              scrollbar-width: none;
+            }
+            .hide-scrollbar::-webkit-scrollbar {
+              display: none;
+            }
+          `}</style>
+        </div>
+
+        {/* Right arrow - Static position */}
         <Button
           variant="ghost"
-          size="sm"
-          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 h-24 w-10 rounded-l-lg bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+          size="icon"
+          className="h-12 w-8 rounded-lg hover:bg-accent hover:text-accent-foreground shrink-0"
           onClick={() => scroll('right')}
         >
           <ChevronRight className="w-6 h-6" />
         </Button>
-
-        {/* Scrollable container with drag */}
-        <div
-          ref={scrollContainerRef}
-          className="flex gap-3 overflow-x-auto pb-4 scroll-smooth snap-x snap-mandatory hide-scrollbar cursor-grab active:cursor-grabbing"
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseLeave}
-        >
-          {allSlides.map((slide) => {
-            const isSelected = selectedSlideIds.includes(slide.id);
-            const isHovered = hoveredSlide === slide.id;
-
-            return (
-              <div
-                key={slide.id}
-                className="flex-shrink-0 snap-start"
-                onMouseEnter={() => setHoveredSlide(slide.id)}
-                onMouseLeave={() => setHoveredSlide(null)}
-              >
-                {/* Thumbnail with overlay */}
-                <div
-                  className={`relative cursor-pointer transition-all ${
-                    isSelected ? 'ring-4 ring-primary ring-offset-2' : ''
-                  } ${isHovered ? 'scale-105' : ''}`}
-                  onClick={() => handleToggleSlide(slide.id)}
-                >
-                  {/* Real thumbnail using SlideThumbnail component */}
-                  <SlideThumbnail
-                    slide={slide}
-                    fullHtml={fullHtml}
-                    width={200}
-                    height={113}
-                  />
-
-                  {/* Selection overlay */}
-                  {isSelected && (
-                    <div className="absolute inset-0 bg-primary/20 rounded-lg pointer-events-none flex items-center justify-center">
-                      <div className="bg-primary text-primary-foreground rounded-full p-2">
-                        <CheckSquare className="w-5 h-5" />
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Checkbox below thumbnail */}
-                <div className="mt-2 flex items-center justify-center gap-2">
-                  <Checkbox
-                    id={`checkbox-${slide.id}`}
-                    checked={isSelected}
-                    onCheckedChange={() => handleToggleSlide(slide.id)}
-                  />
-                  <label
-                    htmlFor={`checkbox-${slide.id}`}
-                    className="text-xs font-medium cursor-pointer"
-                  >
-                    Slide {slide.index + 1}
-                  </label>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Custom scrollbar hide */}
-        <style jsx>{`
-          .hide-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-          }
-          .hide-scrollbar::-webkit-scrollbar {
-            display: none;
-          }
-        `}</style>
       </div>
 
       {/* Empty state */}
