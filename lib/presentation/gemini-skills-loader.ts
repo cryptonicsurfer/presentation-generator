@@ -210,7 +210,7 @@ Use these Falkenberg-styled templates:
 ## Trend Slide (Year-over-Year Comparison)
 \`\`\`html
 <section class="slide bg-white items-center justify-center px-16">
-    <img src="https://kommun.falkenberg.se/document/om-kommunen/grafisk-profil/kommunens-logotyper/liggande-logotyper-foer-tryck/1609-falkenbergskommun-logo-svart-ligg" alt="Falkenbergs kommun" class="slide-logo">
+    <img src="{{LOGO_SVART}}" alt="Falkenbergs kommun" class="slide-logo">
     <div class="max-w-6xl w-full">
         <div class="flex items-center gap-4 mb-12">
             <i data-lucide="trending-up" class="w-12 h-12 text-falkenberg-kommunblå"></i>
@@ -235,7 +235,7 @@ Use these Falkenberg-styled templates:
 ## Comparison Table (Multi-Year)
 \`\`\`html
 <section class="slide bg-white items-center justify-center px-16">
-    <img src="https://kommun.falkenberg.se/document/om-kommunen/grafisk-profil/kommunens-logotyper/liggande-logotyper-foer-tryck/1609-falkenbergskommun-logo-svart-ligg" alt="Falkenbergs kommun" class="slide-logo">
+    <img src="{{LOGO_SVART}}" alt="Falkenbergs kommun" class="slide-logo">
     <div class="max-w-6xl w-full">
         <h2 class="text-5xl font-bold text-gray-900 mb-12">Nyckeltal över tid</h2>
         <table class="w-full text-left">
@@ -271,6 +271,25 @@ Use these Falkenberg-styled templates:
     </div>
 </section>
 \`\`\`
+
+# ⚠️ LOGO USAGE - CRITICAL!
+
+**EVERY slide MUST include the logo using these EXACT placeholders:**
+
+\`\`\`html
+<!-- For LIGHT backgrounds (white, light gray, etc): -->
+<img src="{{LOGO_SVART}}" alt="Falkenbergs kommun" class="slide-logo">
+
+<!-- For DARK backgrounds (blue, green gradients, etc): -->
+<img src="{{LOGO_VIT}}" alt="Falkenbergs kommun" class="slide-logo">
+\`\`\`
+
+**IMPORTANT:**
+- Use EXACTLY {{LOGO_SVART}} or {{LOGO_VIT}} - these are automatically replaced with images
+- DO NOT use URLs or file paths
+- DO NOT leave src empty
+- ALWAYS include class="slide-logo"
+- Place inside <section> tag but outside main content divs
 
 # Chart.js Integration (NEW!)
 
@@ -491,10 +510,10 @@ Use these colors for a professional, brand-consistent look:
   - ängsgrön (#52ae32) - success
   - havtorn (#f39200) - accent
   - vinbär (#ab0d1f) - warning
-- **Logos** (IMPORTANT: Use these EXACT placeholders - they're replaced with images automatically):
+- **Logos**: ⚠️ CRITICAL - See "LOGO USAGE" section above for detailed instructions
   - Light backgrounds: {{LOGO_SVART}}
   - Dark backgrounds: {{LOGO_VIT}}
-  - Always include in <img> tag: <img src="{{LOGO_SVART}}" alt="Falkenbergs kommun" class="slide-logo">
+  - EVERY slide MUST include logo with exact placeholder format
 - **Icons**: Use Lucide icons (data-lucide attribute)
 - **Missing data**: Show "Inga uppgifter tillgängliga"
 - **Charts**: Use Chart.js (see examples above) - NO MORE FAKE CSS CHARTS!
@@ -518,7 +537,7 @@ Return ONLY a JSON object with this exact structure:
 IMPORTANT:
 - Do NOT include title slide or thank you slide in sections (they're added automatically)
 - CREATE 10-15 CONTENT SLIDES (not just 3-4!)
-- Each section must be complete HTML with slide-logo
+- ⚠️ Each section MUST include <img src="{{LOGO_SVART}}" alt="Falkenbergs kommun" class="slide-logo">
 - Use escaped quotes (\\\") in JSON
 - Ensure all HTML is valid and well-formed
 - Include trend slides, comparison tables, and analytical insights
