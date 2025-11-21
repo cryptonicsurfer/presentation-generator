@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# application logs and workspaces (may contain sensitive data)
+/public/logs
+/public/workspaces
