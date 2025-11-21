@@ -11,6 +11,7 @@ export interface GeminiAgentConfig {
   apiKey: string;
   model?: string;
   systemInstruction?: string;
+  cachedContent?: string; // Name of the cached content to use
   maxTurns?: number;
   thinkingLevel?: 'low' | 'high';
 }
@@ -71,7 +72,8 @@ export class GeminiAgent {
     console.log('[GeminiAgent] Starting with config:', {
       model: this.config.model,
       maxTurns: this.config.maxTurns,
-      systemInstructionLength: this.config.systemInstruction?.length
+      systemInstructionLength: this.config.systemInstruction?.length,
+      cachedContent: this.config.cachedContent
     });
 
     let turnCount = 0;
@@ -97,25 +99,30 @@ export class GeminiAgent {
         // Build contents for this request
         const contents = turnCount === 1
           ? [{
-              role: 'user' as const,
-              parts: [
-                { text: userPrompt },
-                // Add images if provided (for visual context)
-                ...(images || []).map(img => ({
-                  inlineData: {
-                    mimeType: img.mimeType,
-                    data: img.data,
-                  }
-                }))
-              ]
-            }]
+            role: 'user' as const,
+            parts: [
+              { text: userPrompt },
+              // Add images if provided (for visual context)
+              ...(images || []).map(img => ({
+                inlineData: {
+                  mimeType: img.mimeType,
+                  data: img.data,
+                }
+              }))
+            ]
+          }]
           : history;
 
         // Call Gemini with current history
         const apiConfig: any = {
-          systemInstruction: this.config.systemInstruction,
           tools: [{ functionDeclarations: geminiTools }],
         };
+
+        // Only add systemInstruction if NOT using cached content
+        // (Cached content already includes the system instruction)
+        if (!this.config.cachedContent) {
+          apiConfig.systemInstruction = this.config.systemInstruction;
+        }
 
         // Add thinking config if enabled (Gemini 3 Pro Preview only)
         if (this.config.thinkingLevel) {
@@ -130,11 +137,18 @@ export class GeminiAgent {
 
         let response;
         try {
-          response = await this.genAI.models.generateContent({
+          const generateOptions: any = {
             model: this.config.model!,
             contents,
             config: apiConfig,
-          });
+          };
+
+          // Add cachedContent if available
+          if (this.config.cachedContent) {
+            generateOptions.cachedContent = this.config.cachedContent;
+          }
+
+          response = await this.genAI.models.generateContent(generateOptions);
         } catch (error: any) {
           // If thinking mode fails, retry without it
           if (error.message?.includes('thinkingLevel') && this.config.thinkingLevel) {
@@ -142,11 +156,18 @@ export class GeminiAgent {
             callback?.({ type: 'status', message: 'Thinking mode inte tillgänglig, fortsätter utan...' });
 
             delete apiConfig.thinkingConfig;
-            response = await this.genAI.models.generateContent({
+
+            const retryOptions: any = {
               model: this.config.model!,
               contents,
               config: apiConfig,
-            });
+            };
+
+            if (this.config.cachedContent) {
+              retryOptions.cachedContent = this.config.cachedContent;
+            }
+
+            response = await this.genAI.models.generateContent(retryOptions);
           } else {
             throw error;
           }
@@ -156,6 +177,12 @@ export class GeminiAgent {
         if (response.usageMetadata) {
           totalInputTokens += response.usageMetadata.promptTokenCount || 0;
           totalOutputTokens += response.usageMetadata.candidatesTokenCount || 0;
+
+          // Log implicit caching metrics
+          const cachedTokens = (response.usageMetadata as any).cachedContentTokenCount || 0;
+          if (cachedTokens > 0) {
+            console.log(`[GeminiAgent] Turn ${turnCount}: 🎯 IMPLICIT CACHE HIT! Cached ${cachedTokens} tokens`);
+          }
         }
 
         // Check for function calls in response
@@ -335,19 +362,32 @@ export class GeminiAgent {
             }],
           });
 
-          const response = await this.genAI.models.generateContent({
+          const finalOptions: any = {
             model: this.config.model!,
             contents: history,
             config: {
-              systemInstruction: this.config.systemInstruction,
               // Disable tools for final response
             },
-          });
+          };
+
+          if (this.config.cachedContent) {
+            finalOptions.cachedContent = this.config.cachedContent;
+          } else {
+            finalOptions.config.systemInstruction = this.config.systemInstruction;
+          }
+
+          const response = await this.genAI.models.generateContent(finalOptions);
 
           // Track final token usage
           if (response.usageMetadata) {
             totalInputTokens += response.usageMetadata.promptTokenCount || 0;
             totalOutputTokens += response.usageMetadata.candidatesTokenCount || 0;
+
+            // Log implicit caching metrics (final tool call)
+            const cachedTokens = (response.usageMetadata as any).cachedContentTokenCount || 0;
+            if (cachedTokens > 0) {
+              console.log(`[GeminiAgent] Final turn: 🎯 IMPLICIT CACHE HIT! Cached ${cachedTokens} tokens`);
+            }
           }
 
           const candidates = response.candidates || [];

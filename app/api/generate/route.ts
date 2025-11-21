@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { GoogleGenAI } from '@google/genai';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { GeminiAgent } from '@/lib/agents/gemini-agent';
 import { createDataAccessMcpServer } from '@/lib/mcp';
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
 
         // Determine provider based on model ID
         const provider = model.startsWith('claude-') ? 'claude' :
-                        model.startsWith('gemini-') ? 'gemini' : null;
+          model.startsWith('gemini-') ? 'gemini' : null;
 
         if (!provider) {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({
@@ -112,16 +113,41 @@ async function generateWithGemini(
 
   controller.enqueue(encoder.encode(`data: ${JSON.stringify({
     type: 'status',
-    message: 'Ansluter till Gemini med MCP tools...'
+    message: 'Ansluter till Gemini (implicit caching aktivt)...'
   })}\n\n`));
+
+  // TESTING IMPLICIT CACHING (automatic on Gemini 2.5 models)
+  // Explicit caching code commented out - implicit caching is enabled by default
+  // and will automatically cache repeated prompts (min 1024 tokens for 2.5 Flash)
+
+  /* EXPLICIT CACHING - Temporarily disabled for testing
+  let cachedContentName: string | undefined;
+
+  try {
+    const genAI = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY });
+
+    const cacheResult = await (genAI as any).caches.create({
+      model: model,
+      displayName: `presentation-gen-${Date.now()}`,
+      systemInstruction: systemPrompt,
+      ttlSeconds: 3600,
+    });
+
+    cachedContentName = cacheResult.name;
+    console.log(`[Gemini] Created cached content: ${cachedContentName}`);
+  } catch (cacheError) {
+    console.error('[Gemini] Failed to create cache:', cacheError);
+  }
+  */
 
   // Create Gemini agent with specified model
   const agent = new GeminiAgent({
     apiKey: process.env.GOOGLE_API_KEY,
     model: model,
-    systemInstruction: systemPrompt,
-    maxTurns: 25, // Balanced: enough for complex prompts, not too many to cause issues
-    thinkingLevel: thinkingLevel, // Enable thinking mode for Gemini 3 Pro Preview
+    systemInstruction: systemPrompt, // System prompt will be implicitly cached by Gemini 2.5
+    // cachedContent: cachedContentName, // Disabled for implicit caching test
+    maxTurns: 25,
+    thinkingLevel: thinkingLevel,
   });
 
   // Tool name to user-friendly message mapping
@@ -438,7 +464,7 @@ async function generateWithClaude(
     // Detect tool usage
     if (message.type === 'assistant' && message.message) {
       const content = Array.isArray(message.message) ? message.message :
-                     (message.message.content ? message.message.content : []);
+        (message.message.content ? message.message.content : []);
 
       for (const block of content) {
         if (block.type === 'tool_use' && block.name) {
@@ -462,7 +488,7 @@ async function generateWithClaude(
     // Detect tool results
     if (message.type === 'user' && message.message) {
       const content = Array.isArray(message.message) ? message.message :
-                     (message.message.content ? message.message.content : []);
+        (message.message.content ? message.message.content : []);
 
       for (const block of content) {
         if (block.type === 'tool_result') {
@@ -529,7 +555,7 @@ async function generateWithClaude(
 
         try {
           const jsonMatch = claudeResponse.match(/```json\s*([\s\S]*?)\s*```/) ||
-                           claudeResponse.match(/\{[\s\S]*?"sections"[\s\S]*?\}/);
+            claudeResponse.match(/\{[\s\S]*?"sections"[\s\S]*?\}/);
 
           if (jsonMatch) {
             const jsonStr = jsonMatch[1] || jsonMatch[0];
