@@ -305,7 +305,14 @@ export class GeminiAgent {
         const errorMsg = error instanceof Error ? error.message : 'Unknown error';
         console.error(`[GeminiAgent] Error on turn ${turnCount}:`, error);
         console.error(`[GeminiAgent] History length at error: ${history.length}`);
-        console.error(`[GeminiAgent] Last history item:`, JSON.stringify(history[history.length - 1], null, 2).substring(0, 500));
+
+        // Only log last history item if history is not empty
+        if (history.length > 0) {
+          const lastItem = JSON.stringify(history[history.length - 1], null, 2);
+          console.error(`[GeminiAgent] Last history item:`, lastItem.substring(0, 500));
+        } else {
+          console.error(`[GeminiAgent] History is empty (error occurred before first turn)`);
+        }
 
         callback?.({ type: 'error', message: errorMsg });
         throw error;
