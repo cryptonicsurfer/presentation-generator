@@ -1,23 +1,15 @@
 import { NextRequest } from 'next/server';
-import { query } from '@anthropic-ai/claude-agent-sdk';
-import { createDataAccessMcpServer } from '@/lib/mcp';
-import { generateTweakSystemPrompt } from '@/lib/presentation/skills-loader';
+import { GeminiAgent } from '@/lib/agents/gemini-agent';
+import { generateGeminiTweakPrompt } from '@/lib/presentation/gemini-skills-loader';
+import { generatePresentationHTML, generateTitleSlide, generateThankYouSlide } from '@/lib/presentation/template';
+import { calculateCost } from '@/lib/pricing';
+import { getDefaultGeminiModel } from '@/lib/config/models';
+import { captureMultipleSlideScreenshots } from '@/lib/utils/screenshot';
 import { writeFileSync } from 'fs';
 import { join } from 'path';
-import { getWorkspace, readHtml, readMetadata } from '@/lib/workspace';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120; // 2 minutes for tweaks
-
-// Type for tool call logging
-type ToolCallLog = {
-  timestamp: string;
-  type: 'tool_use' | 'tool_result';
-  toolName: string;
-  input?: any;
-  output?: any;
-  error?: string;
-};
 
 export async function POST(req: NextRequest) {
   const encoder = new TextEncoder();
@@ -26,266 +18,278 @@ export async function POST(req: NextRequest) {
     async start(controller) {
       try {
         const body = await req.json();
-        const { tweakPrompt, sessionId } = body;
+        const { messages, presentationData: originalPresentationData, selectedSlideIds } = body;
 
-        if (!tweakPrompt || !sessionId) {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', message: 'Tweak prompt and session ID are required' })}\n\n`));
+        // Support legacy single-prompt requests
+        const tweakPrompt = body.tweakPrompt;
+        const history = messages || (tweakPrompt ? [{ role: 'user', content: tweakPrompt }] : []);
+
+        if (!history.length || !originalPresentationData) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', message: 'Messages and presentation data are required' })}\n\n`));
           controller.close();
           return;
         }
 
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'status', message: 'Analyserar dina ändringar...' })}\n\n`));
-
-        // Get workspace from session ID
-        const workspace = getWorkspace(sessionId);
-
-        // Read metadata to get original title
-        const metadata = await readMetadata(workspace);
-        if (!metadata) {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', message: 'Session not found or expired' })}\n\n`));
+        // Check for Google API key
+        if (!process.env.GOOGLE_API_KEY) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+            type: 'error',
+            message: 'GOOGLE_API_KEY not configured. Add it to .env.local'
+          })}\n\n`));
           controller.close();
           return;
         }
 
-        // Verify HTML file exists
-        const currentHtml = await readHtml(workspace);
-        if (!currentHtml) {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', message: 'Presentation file not found' })}\n\n`));
-          controller.close();
-          return;
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'status', message: 'Analyserar dina ändringar med Gemini...' })}\n\n`));
+
+        // Reconstruct current HTML from presentation data
+        const currentTitle = originalPresentationData.title || '';
+        const currentSections = originalPresentationData.sections || [];
+        const fullSections = [
+          generateTitleSlide(currentTitle),
+          ...currentSections,
+          generateThankYouSlide(),
+        ];
+        const currentHTML = generatePresentationHTML(currentTitle, fullSections);
+
+        // Determine which slides need visual context (screenshots)
+        const lastUserMessage = history[history.length - 1]?.content || '';
+        const slideIdsToCapture = determineSlideIdsForScreenshots(lastUserMessage, selectedSlideIds, currentSections);
+
+        // Capture screenshots if needed
+        let screenshots: Array<{ data: string; mimeType: string }> | undefined;
+        if (slideIdsToCapture.length > 0) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+            type: 'status',
+            message: `Tar screenshots av ${slideIdsToCapture.length} slide(s) för visuell kontext...`
+          })}\n\n`));
+
+          try {
+            const screenshotMap = await captureMultipleSlideScreenshots(currentHTML, slideIdsToCapture, {
+              width: 1920,
+              height: 1080,
+              format: 'png',
+            });
+
+            screenshots = Object.values(screenshotMap).map(base64 => ({
+              data: base64,
+              mimeType: 'image/png',
+            }));
+
+            console.log(`[Tweak] Captured ${screenshots.length} screenshots for visual context`);
+          } catch (error) {
+            console.error('[Tweak] Failed to capture screenshots:', error);
+            // Continue without screenshots
+          }
         }
 
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'status', message: 'Presentation hittad, förbereder ändringar...' })}\n\n`));
+        // Generate tweak-specific system prompt
+        const hasVisualContext = screenshots && screenshots.length > 0;
+        const systemPrompt = await generateGeminiTweakPrompt(history, currentHTML, currentTitle, hasVisualContext);
 
-        // Generate tweak-specific system prompt with file-based editing
-        const systemPrompt = await generateTweakSystemPrompt(
-          tweakPrompt,
-          workspace.workspaceDir,
-          metadata.title
-        );
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'status', message: 'Ansluter till Gemini...' })}\n\n`));
 
-        // Create MCP server with database tools (same as generate)
-        const mcpServer = createDataAccessMcpServer();
-
-        // Run query WITH Read/Edit tools for file-based editing
-        const queryInstance = query({
-          prompt: `Please make the following changes to the presentation:\n\n${tweakPrompt}`,
-          options: {
-            systemPrompt,
-            // Set working directory to workspace
-            cwd: workspace.workspaceDir,
-            mcpServers: {
-              'fbg-data-access': mcpServer,
-            },
-            model: 'claude-sonnet-4-5-20250929',
-            maxTurns: 20, // Allow more turns for Read + Edit cycles
-            // CRITICAL: Enable Read/Edit tools for file-based diff-editing
-            allowedTools: [
-              'Read',  // Read current HTML file
-              'Edit',  // Make precise string replacements
-              'mcp__fbg-data-access__query_fbg_analytics',
-              'mcp__fbg-data-access__search_directus_companies',
-              'mcp__fbg-data-access__count_directus_meetings',
-              'mcp__fbg-data-access__get_directus_contacts',
-            ],
-            settingSources: [],
-            permissionMode: 'bypassPermissions',
-          },
+        // Create Gemini agent
+        const model = getDefaultGeminiModel();
+        const agent = new GeminiAgent({
+          apiKey: process.env.GOOGLE_API_KEY,
+          model: model,
+          systemInstruction: systemPrompt,
+          maxTurns: 15, // Allow more turns if database queries needed
         });
 
         // Tool name to user-friendly message mapping
         const toolMessages: Record<string, string> = {
-          'Read': 'Läser presentationsfil...',
-          'Edit': 'Gör ändringar i presentationen...',
-          'mcp__fbg-data-access__search_directus_companies': 'Söker efter företag i CRM...',
-          'mcp__fbg-data-access__query_fbg_analytics': 'Hämtar uppdaterad data från databas...',
-          'mcp__fbg-data-access__count_directus_meetings': 'Räknar antal möten...',
-          'mcp__fbg-data-access__get_directus_contacts': 'Hämtar kontaktpersoner...',
+          'query_fbg_analytics': 'Hämtar uppdaterad data från databas...',
+          'search_directus_companies': 'Söker efter företag i CRM...',
+          'count_directus_meetings': 'Räknar antal möten...',
+          'get_directus_contacts': 'Hämtar kontaktpersoner...',
         };
 
-        let messageCount = 0;
-        let allMessages: any[] = [];
-        let toolCallsLog: ToolCallLog[] = [];
-
-        for await (const message of queryInstance) {
-          messageCount++;
-          allMessages.push(message);
-
-          // Detect tool usage and send specific status updates
-          if (message.type === 'assistant' && message.message) {
-            const content = Array.isArray(message.message) ? message.message :
-                           (message.message.content ? message.message.content : []);
-
-            for (const block of content) {
-              if (block.type === 'tool_use' && block.name) {
-                // Log tool call
-                toolCallsLog.push({
-                  timestamp: new Date().toISOString(),
-                  type: 'tool_use',
-                  toolName: block.name,
-                  input: block.input || {}
-                });
-
-                const toolMessage = toolMessages[block.name] || 'Hämtar data...';
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({
-                  type: 'tool',
-                  message: toolMessage,
-                  tool: block.name
-                })}\n\n`));
-              }
-            }
-          }
-
-          // Detect tool results from user messages (containing tool_result blocks)
-          if (message.type === 'user' && message.message) {
-            const content = Array.isArray(message.message) ? message.message :
-                           (message.message.content ? message.message.content : []);
-
-            for (const block of content) {
-              if (block.type === 'tool_result') {
-                const toolUseId = (block as any).tool_use_id || 'unknown';
-                const isError = (block as any).is_error || false;
-                const resultContent = (block as any).content;
-
-                // Try to extract text from content
-                let textContent = resultContent;
-                if (Array.isArray(resultContent)) {
-                  textContent = resultContent.find((c: any) => c.type === 'text')?.text || resultContent;
-                }
-
-                toolCallsLog.push({
-                  timestamp: new Date().toISOString(),
-                  type: 'tool_result',
-                  toolName: toolUseId,
-                  output: isError ? undefined : textContent,
-                  error: isError ? textContent : undefined
-                });
-              }
-            }
-          }
-
-          if (messageCount % 3 === 0) {
+        // Run Gemini agent with callbacks (including screenshots for visual context)
+        const { result, toolCallsLog, usage } = await agent.run(lastUserMessage, (message) => {
+          if (message.type === 'tool' && message.tool) {
+            const toolMessage = toolMessages[message.tool] || 'Hämtar data...';
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+              type: 'tool',
+              message: toolMessage,
+              tool: message.tool
+            })}\n\n`));
+          } else if (message.type === 'thinking') {
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({
               type: 'thinking',
-              message: 'Claude justerar presentationen...'
+              message: 'Gemini justerar presentationen...'
             })}\n\n`));
           }
+        }, screenshots);
 
-          if (message.type === 'result') {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'status', message: 'Läser uppdaterad presentation...' })}\n\n`));
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'status', message: 'Behandlar ändringar...' })}\n\n`));
 
-            // Read the updated HTML file (Claude edited it with Edit tool)
-            const updatedHTML = await readHtml(workspace);
+        // Parse Gemini's diff-edit response
+        let updatedHTML = currentHTML;
+        let changesSummary = 'Uppdaterat';
 
-            if (!updatedHTML) {
+        try {
+          // Try to parse JSON response with edits or newSlides
+          const jsonMatch = result.match(/```json\s*([\s\S]*?)\s*```/) ||
+            result.match(/\{[\s\S]*?("edits"|"newSlides")[\s\S]*?\}/);
+
+          if (jsonMatch) {
+            const jsonStr = jsonMatch[1] || jsonMatch[0];
+            const tweakData = JSON.parse(jsonStr);
+
+            // Handle adding new slides
+            if (tweakData.newSlides && Array.isArray(tweakData.newSlides)) {
+              // Find the thank you slide position
+              const thankYouMatch = updatedHTML.match(/(<section[^>]*id="slide-thankyou"[^>]*>[\s\S]*?<\/section>)/);
+
+              if (thankYouMatch) {
+                const thankYouSlide = thankYouMatch[1];
+                const beforeThankYou = updatedHTML.substring(0, thankYouMatch.index);
+                const afterThankYou = updatedHTML.substring(thankYouMatch.index! + thankYouSlide.length);
+
+                // Insert new slides before thank you slide
+                const newSlidesHTML = tweakData.newSlides.join('\n        ');
+                updatedHTML = beforeThankYou + newSlidesHTML + '\n        ' + thankYouSlide + afterThankYou;
+
+                changesSummary = tweakData.changesSummary || `Lade till ${tweakData.newSlides.length} nya slides`;
+
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                  type: 'status',
+                  message: `Ändringar: ${changesSummary}`
+                })}\n\n`));
+              } else {
+                console.error('[Tweak] Could not find thank you slide to insert new slides before it');
+                changesSummary = 'Fel: Kunde inte hitta thank you slide';
+              }
+            }
+            // Handle editing existing slides
+            else if (tweakData.edits && Array.isArray(tweakData.edits)) {
+              // Apply all edits
+              updatedHTML = currentHTML;
+              for (const edit of tweakData.edits) {
+                if (edit.old_string !== undefined && edit.new_string !== undefined) {
+                  if (edit.target_id) {
+                    // ID-based targeting (Robust)
+                    const idRegex = new RegExp(`(<section[^>]*id="${edit.target_id}"[^>]*>)([\\s\\S]*?)(<\\/section>)`);
+                    const match = updatedHTML.match(idRegex);
+
+                    if (match) {
+                      const [fullMatch, openTag, content, closeTag] = match;
+                      // Replace only within this section
+                      if (content.includes(edit.old_string)) {
+                        const newContent = content.replace(edit.old_string, edit.new_string);
+                        updatedHTML = updatedHTML.replace(fullMatch, `${openTag}${newContent}${closeTag}`);
+                      } else {
+                        console.warn(`[Tweak] Target ID ${edit.target_id} found, but old_string not found in content.`);
+                        // Fallback: Try global replace if ID match failed (optional, maybe risky?)
+                        // updatedHTML = updatedHTML.replace(edit.old_string, edit.new_string);
+                      }
+                    } else {
+                      console.warn(`[Tweak] Target ID ${edit.target_id} not found.`);
+                    }
+                  } else {
+                    // Global replace (Legacy/Global style changes)
+                    updatedHTML = updatedHTML.replace(edit.old_string, edit.new_string);
+                  }
+                }
+              }
+
+              changesSummary = tweakData.changesSummary || 'Ändringar tillämpade';
+
               controller.enqueue(encoder.encode(`data: ${JSON.stringify({
-                type: 'error',
-                message: 'Kunde inte läsa uppdaterad presentation'
+                type: 'status',
+                message: `Ändringar: ${changesSummary}`
               })}\n\n`));
-              controller.close();
-              return;
             }
-
-            // Extract title from HTML
-            let updatedTitle = metadata.title; // Default to original
-            const titleMatch = updatedHTML.match(/<title>(.*?)<\/title>/);
-            if (titleMatch) {
-              updatedTitle = titleMatch[1];
-            }
-
-            // Count slides
-            const slideCount = (updatedHTML.match(/<section class="slide/g) || []).length;
-
-            // Extract changes summary from Claude's response (if provided)
-            let changesSummary = 'Ändringar genomförda';
-            for (const msg of allMessages) {
-              if (msg.type === 'assistant') {
-                let text = '';
-                if (msg.message && Array.isArray(msg.message)) {
-                  for (const block of msg.message) {
-                    if (block.type === 'text' && block.text) {
-                      text += block.text;
-                    }
-                  }
-                }
-
-                // Try to extract changesSummary from JSON if Claude provided it
-                const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
-                if (jsonMatch) {
-                  try {
-                    const data = JSON.parse(jsonMatch[1]);
-                    if (data.changesSummary) {
-                      changesSummary = data.changesSummary;
-                    }
-                  } catch (e) {
-                    // Ignore parsing errors
-                  }
-                }
-              }
-            }
-
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({
-              type: 'status',
-              message: `Ändringar: ${changesSummary}`
-            })}\n\n`));
-
-            const presentationHTML = updatedHTML;
-
-            // Save tool calls log to public directory
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const logFileName = `tweak-tool-calls-${timestamp}.json`;
-            const logFilePath = join(process.cwd(), 'public', 'logs', logFileName);
-
-            try {
-              // Ensure logs directory exists
-              const logsDir = join(process.cwd(), 'public', 'logs');
-              const { mkdirSync } = await import('fs');
-              try {
-                mkdirSync(logsDir, { recursive: true });
-              } catch (e) {
-                // Directory might already exist
-              }
-
-              // Write log file
-              writeFileSync(logFilePath, JSON.stringify({
-                generatedAt: new Date().toISOString(),
-                type: 'tweak',
-                tweakPrompt,
-                sessionId,
-                originalTitle: metadata.title,
-                model: 'claude-sonnet-4-5-20250929',
-                toolCalls: toolCallsLog,
-                summary: {
-                  totalToolCalls: toolCallsLog.filter(t => t.type === 'tool_use').length,
-                  successfulResults: toolCallsLog.filter(t => t.type === 'tool_result' && !t.error).length,
-                  errors: toolCallsLog.filter(t => t.type === 'tool_result' && t.error).length,
-                  toolsUsed: [...new Set(toolCallsLog.filter(t => t.type === 'tool_use').map(t => t.toolName))]
-                }
-              }, null, 2));
-
-              console.log(`Tweak tool calls log saved to: ${logFilePath}`);
-            } catch (logError) {
-              console.error('Failed to save tweak tool calls log:', logError);
-            }
-
-            // Base64 encode HTML to safely send via SSE
-            const htmlBase64 = Buffer.from(presentationHTML).toString('base64');
-
-            // Send completion
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({
-              type: 'complete',
-              htmlBase64,
-              title: updatedTitle,
-              slideCount,
-              sessionId, // Return session ID for future tweaks
-              toolCallsLogUrl: `/logs/${logFileName}`
-            })}\n\n`));
+          } else {
+            // Fallback: no edits found, keep original
+            console.log('No edits found in Gemini response:', result.substring(0, 500));
+            changesSummary = 'Inga ändringar gjordes';
           }
+        } catch (error) {
+          console.error('Error parsing tweak response:', error);
+          changesSummary = 'Fel vid tolkning av ändringar';
         }
+
+        // Extract sections from updated HTML
+        const sectionMatches = updatedHTML.matchAll(/<section class="slide[^>]*>([\s\S]*?)<\/section>/g);
+        const allSections = Array.from(sectionMatches).map(match => match[0]);
+
+        // Remove title and thank you slides (first and last)
+        const updatedSections = allSections.slice(1, -1);
+
+        // Extract title from updated HTML
+        const titleMatch = updatedHTML.match(/<title>(.*?)<\/title>/);
+        const updatedTitle = titleMatch ? titleMatch[1].replace(' - Falkenberg Kommun', '') : currentTitle;
+
+        // Save tool calls log to public directory
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const logFileName = `gemini-tweak-tool-calls-${timestamp}.json`;
+        const logFilePath = join(process.cwd(), 'public', 'logs', logFileName);
+
+        try {
+          // Ensure logs directory exists
+          const logsDir = join(process.cwd(), 'public', 'logs');
+          const { mkdirSync } = await import('fs');
+          try {
+            mkdirSync(logsDir, { recursive: true });
+          } catch (e) {
+            // Directory might already exist
+          }
+
+          // Write log file
+          writeFileSync(logFilePath, JSON.stringify({
+            generatedAt: new Date().toISOString(),
+            backend: 'gemini',
+            type: 'tweak',
+            history: history,
+            originalTitle: currentTitle,
+            model: model,
+            toolCalls: toolCallsLog,
+            summary: {
+              totalToolCalls: toolCallsLog.filter(t => t.type === 'tool_use').length,
+              successfulResults: toolCallsLog.filter(t => t.type === 'tool_result' && !t.error).length,
+              errors: toolCallsLog.filter(t => t.type === 'tool_result' && t.error).length,
+              toolsUsed: [...new Set(toolCallsLog.filter(t => t.type === 'tool_use').map(t => t.toolName))]
+            }
+          }, null, 2));
+
+          console.log(`Gemini tweak tool calls log saved to: ${logFilePath}`);
+        } catch (logError) {
+          console.error('Failed to save Gemini tweak tool calls log:', logError);
+        }
+
+        // Base64 encode HTML to safely send via SSE
+        const htmlBase64 = Buffer.from(updatedHTML).toString('base64');
+
+        // Calculate cost
+        const cost = usage ? calculateCost(model, usage.inputTokens, usage.outputTokens) : 0;
+
+        // Send completion
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+          type: 'complete',
+          htmlBase64,
+          title: updatedTitle,
+          slideCount: allSections.length,
+          presentationData: {
+            title: updatedTitle,
+            sections: updatedSections
+          },
+          toolCallsLogUrl: `/logs/${logFileName}`,
+          backend: 'gemini',
+          model: model,
+          usage: usage ? {
+            inputTokens: usage.inputTokens,
+            outputTokens: usage.outputTokens,
+            totalTokens: usage.totalTokens,
+            cost: cost,
+          } : undefined,
+        })}\n\n`));
 
         controller.close();
       } catch (error) {
-        console.error('Error tweaking presentation:', error);
+        console.error('Error tweaking presentation with Gemini:', error);
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({
           type: 'error',
           message: error instanceof Error ? error.message : 'Ett okänt fel inträffade'
@@ -302,4 +306,65 @@ export async function POST(req: NextRequest) {
       'Connection': 'keep-alive',
     },
   });
+}
+
+/**
+ * Determine which slides need screenshots for visual context
+ * Priority:
+ * 1. Selected slides from carousel
+ * 2. Slides mentioned in user message (e.g., "slide 3", "denna slide")
+ * 3. All slides if user mentions visual changes without specifics
+ */
+function determineSlideIdsForScreenshots(
+  userMessage: string,
+  selectedSlideIds?: string[],
+  currentSections?: string[]
+): string[] {
+  const slideIds: Set<string> = new Set();
+
+  // 1. Add explicitly selected slides
+  if (selectedSlideIds && selectedSlideIds.length > 0) {
+    selectedSlideIds.forEach(id => slideIds.add(id));
+    return Array.from(slideIds);
+  }
+
+  // 2. Parse message for slide references
+  const messageLower = userMessage.toLowerCase();
+
+  // Match patterns like "slide 3", "slide 2-4", etc.
+  const slideNumberMatches = messageLower.matchAll(/slide[s]?\s+(\d+)(?:\s*-\s*(\d+))?/g);
+  for (const match of slideNumberMatches) {
+    const start = parseInt(match[1]);
+    const end = match[2] ? parseInt(match[2]) : start;
+
+    for (let i = start; i <= end; i++) {
+      // Convert 1-based index to slide ID
+      // slide-0 is title, slide-1 is first content slide, etc.
+      if (i === 1) {
+        slideIds.add('slide-title');
+      } else if (currentSections && i === currentSections.length + 2) {
+        slideIds.add('slide-thankyou');
+      } else if (i > 1 && currentSections && i <= currentSections.length + 1) {
+        slideIds.add(`slide-${i - 2}`);
+      }
+    }
+  }
+
+  // 3. Check for visual-related keywords that benefit from screenshots
+  const visualKeywords = [
+    'chart', 'diagram', 'graf', 'färg', 'color', 'layout', 'design',
+    'denna', 'this', 'den här', 'det här'
+  ];
+
+  const hasVisualKeywords = visualKeywords.some(keyword => messageLower.includes(keyword));
+
+  // If visual keywords and no specific slides mentioned, capture all content slides
+  if (hasVisualKeywords && slideIds.size === 0 && currentSections) {
+    // Add all content slides (skip title and thank you for now)
+    for (let i = 0; i < currentSections.length; i++) {
+      slideIds.add(`slide-${i}`);
+    }
+  }
+
+  return Array.from(slideIds);
 }

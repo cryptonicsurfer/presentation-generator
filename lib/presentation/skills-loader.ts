@@ -215,6 +215,98 @@ Follow these steps:
 
 5. **Return the complete presentation**: Combine all sections into final HTML
 
+# ⚠️ LOGO USAGE - CRITICAL!
+
+**EVERY slide MUST include the logo using these EXACT placeholders:**
+
+\`\`\`html
+<!-- For LIGHT backgrounds (white, light gray, etc): -->
+<img src="{{LOGO_SVART}}" alt="Falkenbergs kommun" class="slide-logo">
+
+<!-- For DARK backgrounds (blue, green gradients, etc): -->
+<img src="{{LOGO_VIT}}" alt="Falkenbergs kommun" class="slide-logo">
+\`\`\`
+
+**IMPORTANT:**
+- Use EXACTLY {{LOGO_SVART}} or {{LOGO_VIT}} - these are automatically replaced with images
+- DO NOT use URLs or file paths
+- DO NOT leave src empty
+- ALWAYS include class="slide-logo"
+- Place inside <section> tag but outside main content divs
+
+# Chart.js Integration
+
+**You now have Chart.js 4.4.1 available!** Create professional, interactive charts.
+
+## Chart.js Basics
+
+**Available chart types:**
+- bar - Bar charts (vertical or horizontal)
+- line - Line charts with trends
+- pie - Pie charts
+- doughnut - Doughnut charts
+
+**How to create a chart:**
+
+1. Add a canvas element with a unique ID
+2. Add a script tag that creates the chart
+3. Use Falkenberg color palette
+
+## Chart.js Example - Bar Chart
+
+\`\`\`html
+<div class="w-full max-w-2xl">
+    <canvas id="chart-revenue-trend"></canvas>
+</div>
+
+<script>
+const ctx = document.getElementById('chart-revenue-trend').getContext('2d');
+new Chart(ctx, {
+    type: 'bar',
+    data: {
+        labels: ['2020', '2021', '2022', '2023', '2024'],
+        datasets: [{
+            label: 'Omsättning (Mkr)',
+            data: [45.2, 52.1, 58.3, 61.9, 67.4],
+            backgroundColor: '#1f4e99', // falkenberg-kommunblå
+            borderRadius: 8,
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            legend: { display: false }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    font: { size: 14, family: 'Lato' },
+                    color: '#414042'
+                }
+            }
+        }
+    }
+});
+</script>
+\`\`\`
+
+## Falkenberg Color Palette for Charts
+
+Use these colors for a professional, brand-consistent look:
+
+- **Primary**: #1f4e99 (kommunblå)
+- **Success**: #52ae32 (ängsgrön)
+- **Accent**: #f39200 (havtorn)
+- **Warning**: #ab0d1f (vinbär)
+
+**IMPORTANT Chart.js Rules:**
+1. Always use unique canvas IDs (e.g., chart-revenue-1, chart-employees-2)
+2. Place script AFTER canvas element
+3. Use script tags (they won't be removed if they contain new Chart)
+4. Use Falkenberg colors from the palette above
+
 # HTML Slide Templates
 
 Use these templates for different slide types:
@@ -222,7 +314,7 @@ Use these templates for different slide types:
 ## Stats Grid (3 columns)
 \`\`\`html
 <section class="slide bg-white items-center justify-center px-16">
-    <img src="/assets/Falkenbergskommun-logo_CMYK_POS_LIGG.png"
+    <img src="{{LOGO_SVART}}"
          alt="Falkenbergs kommun" class="slide-logo">
     <div class="max-w-6xl w-full">
         <div class="flex items-center gap-4 mb-12">
@@ -244,7 +336,7 @@ Use these templates for different slide types:
 ## Company Overview
 \`\`\`html
 <section class="slide bg-white items-center justify-center px-16">
-    <img src="/assets/Falkenbergskommun-logo_CMYK_POS_LIGG.png"
+    <img src="{{LOGO_SVART}}"
          alt="Falkenbergs kommun" class="slide-logo">
     <div class="max-w-6xl w-full">
         <h2 class="text-5xl font-bold text-gray-900 mb-12">Company Name</h2>
@@ -301,7 +393,10 @@ Return your response as a JSON object with this structure:
 }
 \`\`\`
 
-The sections array should contain complete HTML for each slide. I will combine them into the final presentation.
+IMPORTANT:
+- The sections array should contain complete HTML for each slide
+- ⚠️ Each section MUST include <img src="{{LOGO_SVART}}" alt="Falkenbergs kommun" class="slide-logo">
+- I will combine them into the final presentation
 `}
 
 # Start Now

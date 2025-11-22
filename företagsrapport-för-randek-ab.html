@@ -1,74 +1,12 @@
-import { injectLogos } from './logos';
-
-/**
- * Generate the base HTML template for presentations
- */
-export function generatePresentationHTML(title: string, sections: string[]): string {
-  // Remove DANGEROUS script tags but ALLOW Chart.js initialization
-  let totalScriptsRemoved = 0;
-  const cleanedSections = sections.map((section, index) => {
-    // Safety check: ensure section is a string
-    if (typeof section !== 'string') {
-      console.error(`[Template] Section ${index} is not a string! Type: ${typeof section}`, section);
-      return String(section); // Convert to string as fallback
-    }
-
-    const before = section.length;
-
-    let cleaned = section;
-
-    // Only remove scripts that DON'T contain Chart.js code
-    // Keep scripts that create charts
-    const scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
-    let chartScriptsKept = 0;
-    let otherScriptsRemoved = 0;
-
-    cleaned = cleaned.replace(scriptRegex, (match, content) => {
-      // Keep Chart.js initialization scripts
-      if (content.includes('new Chart(') || content.includes('Chart.register')) {
-        chartScriptsKept++;
-        console.log(`[Template] Section ${index}: Keeping Chart.js script (${content.length} chars)`);
-        return match;
-      }
-      // Remove everything else
-      otherScriptsRemoved++;
-      return '';
-    });
-
-    if (chartScriptsKept > 0) {
-      console.log(`[Template] Section ${index}: Kept ${chartScriptsKept} Chart.js scripts, removed ${otherScriptsRemoved} other scripts`);
-    }
-
-    // Inject unique ID if not present
-    // We use index + 1 because title slide will be slide-0 (or we can make title slide slide-1)
-    // Let's make Title = slide-0, Content = slide-1..N, Thank You = slide-N+1
-    // But here 'sections' are just the content slides.
-    // The actual full list is assembled in the route handler usually.
-    // Wait, the route handler calls generatePresentationHTML with the FULL list including title/thankyou.
-    // Let's just inject IDs based on the loop index.
-    if (!cleaned.includes('id="slide-')) {
-      cleaned = cleaned.replace(/<section class="slide/, `<section id="slide-${index}" class="slide`);
-    }
-
-    const after = cleaned.length;
-    if (before !== after) {
-      totalScriptsRemoved++;
-      console.log(`[Template] Section ${index}: Removed ${before - after} chars of <script> tags`);
-    }
-
-    return cleaned;
-  });
-
-  const html = `<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="sv">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${title} - Falkenberg Kommun</title>
-    <!-- Script tags removed from ${totalScriptsRemoved} sections to prevent conflicts -->
+    <title>Företagsrapport för Randek AB - Falkenberg Kommun</title>
+    <!-- Script tags removed from 0 sections to prevent conflicts -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;800&family=Lato:wght@300;400&display=swap" rel="stylesheet">
@@ -216,7 +154,84 @@ export function generatePresentationHTML(title: string, sections: string[]): str
 
     <!-- Slides Container -->
     <div id="slides-container">
-        ${cleanedSections.join('\n')}
+        <section class="slide bg-gradient-to-br from-falkenberg-kommunblå to-falkenberg-marinblå items-center justify-center">
+    <img src="/assets/Falkenbergskommun-logo_VIT_LIGG.svg"
+         alt="Falkenbergs kommun" class="slide-logo">
+    <div class="text-center text-white px-16">
+        <h1 class="text-7xl font-bold mb-6">Företagsrapport för Randek AB</h1>
+        
+        <p class="text-xl font-light opacity-80">14 november 2025</p>
+    </div>
+</section>
+<section class="slide bg-white items-center justify-center px-16">
+    <img src="/assets/Falkenbergskommun-logo_CMYK_POS_LIGG.png"
+         alt="Falkenbergs kommun" class="slide-logo">
+    <div class="max-w-6xl w-full">
+        <h2 class="text-5xl font-bold text-gray-900 mb-12">Randek AB - Företagsöversikt</h2>
+        <div class="grid grid-cols-2 gap-8">
+            <div>
+                <h3 class="text-2xl font-bold text-falkenberg-kommunblå mb-4">Beskrivning</h3>
+                <p class="text-lg text-gray-700">Information om företaget kommer här...</p>
+            </div>
+            <div>
+                <h3 class="text-2xl font-bold text-falkenberg-kommunblå mb-4">Kontakt</h3>
+                <p class="text-lg text-gray-700">Kontaktinformation kommer här...</p>
+            </div>
+        </div>
+    </div>
+</section>
+<section class="slide bg-white items-center justify-center px-16">
+    <img src="/assets/Falkenbergskommun-logo_CMYK_POS_LIGG.png"
+         alt="Falkenbergs kommun" class="slide-logo">
+    <div class="max-w-6xl w-full">
+        <div class="flex items-center gap-4 mb-12">
+            <i data-lucide="bar-chart" class="w-12 h-12 text-falkenberg-kommunblå"></i>
+            <h2 class="text-5xl font-bold text-gray-900">Ekonomisk Data</h2>
+        </div>
+        <div class="grid grid-cols-3 gap-8">
+            <div class="bg-white p-10 rounded-2xl shadow-xl text-center border-2 border-gray-100">
+                <i data-lucide="users" class="w-16 h-16 mx-auto mb-6 text-falkenberg-kommunblå"></i>
+                <div class="text-6xl font-bold text-falkenberg-kommunblå mb-3">Inga uppgifter tillgängliga</div>
+                <p class="text-xl text-gray-600">Anställda</p>
+            </div>
+            <div class="bg-white p-10 rounded-2xl shadow-xl text-center border-2 border-gray-100">
+                <i data-lucide="currency" class="w-16 h-16 mx-auto mb-6 text-falkenberg-kommunblå"></i>
+                <div class="text-6xl font-bold text-falkenberg-kommunblå mb-3">Inga uppgifter tillgängliga</div>
+                <p class="text-xl text-gray-600">Omsättning (tkr)</p>
+            </div>
+            <div class="bg-white p-10 rounded-2xl shadow-xl text-center border-2 border-gray-100">
+                <i data-lucide="activity" class="w-16 h-16 mx-auto mb-6 text-falkenberg-kommunblå"></i>
+                <div class="text-6xl font-bold text-falkenberg-kommunblå mb-3">Inga uppgifter tillgängliga</div>
+                <p class="text-xl text-gray-600">Resultat (tkr)</p>
+            </div>
+        </div>
+    </div>
+</section>
+<section class="slide bg-white items-center justify-center px-16">
+    <img src="/assets/Falkenbergskommun-logo_CMYK_POS_LIGG.png"
+         alt="Falkenbergs kommun" class="slide-logo">
+    <div class="max-w-6xl w-full">
+        <div class="flex items-center gap-4 mb-12">
+            <i data-lucide="handshake" class="w-12 h-12 text-falkenberg-kommunblå"></i>
+            <h2 class="text-5xl font-bold text-gray-900">Interaktioner</h2>
+        </div>
+        <div class="grid grid-cols-1 gap-8">
+            <div class="bg-white p-10 rounded-2xl shadow-xl text-center border-2 border-gray-100">
+                <i data-lucide="calendar" class="w-16 h-16 mx-auto mb-6 text-falkenberg-kommunblå"></i>
+                <div class="text-6xl font-bold text-falkenberg-kommunblå mb-3">Inga uppgifter tillgängliga</div>
+                <p class="text-xl text-gray-600">Möten detta år</p>
+            </div>
+        </div>
+    </div>
+</section>
+<section class="slide bg-gradient-to-br from-falkenberg-ängsgrön to-falkenberg-havsvik items-center justify-center">
+    <img src="/assets/Falkenbergskommun-logo_VIT_LIGG.svg"
+         alt="Falkenbergs kommun" class="slide-logo">
+    <div class="text-center text-white px-16">
+        <h1 class="text-7xl font-bold mb-6">Tack!</h1>
+        <p class="text-3xl font-light">Frågor?</p>
+    </div>
+</section>
     </div>
 
     <script>
@@ -283,39 +298,4 @@ export function generatePresentationHTML(title: string, sections: string[]): str
       })();
     </script>
 </body>
-</html>`;
-
-  // Inject base64 logos AFTER generation to keep prompts token-efficient
-  return injectLogos(html);
-}
-
-/**
- * Generate a title slide
- */
-export function generateTitleSlide(title: string, subtitle?: string, date?: string): string {
-  const displayDate = date || new Date().toLocaleDateString('sv-SE', { year: 'numeric', month: 'long', day: 'numeric' });
-
-  return `<section id="slide-title" class="slide bg-gradient-to-br from-falkenberg-kommunblå to-falkenberg-marinblå items-center justify-center">
-    <img src="{{LOGO_VIT}}"
-         alt="Falkenbergs kommun" class="slide-logo">
-    <div class="text-center text-white px-16">
-        <h1 class="text-7xl font-bold mb-6">${title}</h1>
-        ${subtitle ? `<p class="text-3xl font-light mb-8">${subtitle}</p>` : ''}
-        <p class="text-xl font-light opacity-80">${displayDate}</p>
-    </div>
-</section>`;
-}
-
-/**
- * Generate a thank you slide
- */
-export function generateThankYouSlide(): string {
-  return `<section id="slide-thankyou" class="slide bg-gradient-to-br from-falkenberg-ängsgrön to-falkenberg-havsvik items-center justify-center">
-    <img src="{{LOGO_VIT}}"
-         alt="Falkenbergs kommun" class="slide-logo">
-    <div class="text-center text-white px-16">
-        <h1 class="text-7xl font-bold mb-6">Tack!</h1>
-        <p class="text-3xl font-light">Frågor?</p>
-    </div>
-</section>`;
-}
+</html>
