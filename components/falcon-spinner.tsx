@@ -35,13 +35,13 @@ export function FalconSpinner() {
         "00100011100000100000",
         "00100110000000100000",
         "00100111100000100000",
-        "00100001110000100000",
-        "00100000111000100000",
+        "00100001111000100000",
         "00100000111100100000",
-        "00100000101110100000",
-        "00100000100111100000",
-        "00100000100011100000",
-        "00100000100001100000",
+        "00100000111100100000",
+        "00100000101100100000",
+        "00100000100110100000",
+        "00100000100010100000",
+        "00100000100010100000",
         "00100001110000100000",
         "00100011111000100000",
         "00011111111111000000",
@@ -69,13 +69,18 @@ export function FalconSpinner() {
 
       // Body Color Options (uncomment one):
       // const materialBody = new THREE.MeshBasicMaterial({ color: 0x000000 }); // Pure Black (default)
-      const materialBody = new THREE.MeshBasicMaterial({ color: 0x1f4e99 }); // Falkenberg Kommunblå
+      // const materialBody = new THREE.MeshBasicMaterial({ color: 0x1f4e99 }); // Falkenberg Kommunblå
       // const materialBody = new THREE.MeshBasicMaterial({ color: 0x414042 }); // Dark Gray (mörkgrå)
+      const materialBody = new THREE.MeshBasicMaterial({ color: 0x00CED1 }); // Cyan/Teal Blue-Green
+
 
       // Edge Color Options (uncomment one):
       // const materialEdges = new THREE.LineBasicMaterial({ color: 0xaaaaaa }); // Light Gray (default)
       // const materialEdges = new THREE.LineBasicMaterial({ color: 0xffffff }); // White
-      const materialEdges = new THREE.LineBasicMaterial({ color: 0x86cedf }); // Falkenberg Himmelsblå
+      // const materialEdges = new THREE.LineBasicMaterial({ color: 0x86cedf }); // Falkenberg Himmelsblå
+      // const materialEdges = new THREE.LineBasicMaterial({ color: 0x00CED1 }); // Cyan/Teal Blue-Green
+      const materialEdges = new THREE.LineBasicMaterial({ color: 0x000000 }); // Pure Black (default)
+
 
       const voxels: any[] = [];
       const rows = PIXEL_MAP.length;
