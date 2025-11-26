@@ -184,8 +184,8 @@ Return a JSON array of updated slides:
         // Create Gemini agent
         console.log('[tweak-slides] Creating Gemini agent with model:', model);
         const agent = new GeminiAgent({
+          apiKey: process.env.GOOGLE_API_KEY!,
           model,
-          tools: geminiTools,
           systemInstruction: systemPrompt,
           maxTurns: 10,
         });
