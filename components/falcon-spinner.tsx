@@ -230,12 +230,24 @@ export function FalconSpinner() {
   }, []);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-      <div className="flex flex-col items-center gap-4">
-        <div ref={containerRef} className="w-[400px] h-[400px]" />
-        <p className="text-white text-lg font-medium animate-pulse">
-          Genererar presentation...
-        </p>
+    <div className="fixed inset-0 z-50 bg-black/70">
+      {/* Radial blur overlay - strongest in center, fades towards edges so status component is visible */}
+      <div
+        className="absolute inset-0 backdrop-blur-xl"
+        style={{
+          maskImage: 'radial-gradient(circle at center, black 0%, black 25%, transparent 60%)',
+          WebkitMaskImage: 'radial-gradient(circle at center, black 0%, black 25%, transparent 60%)'
+        }}
+      />
+
+      {/* Content */}
+      <div className="relative flex items-center justify-center h-full">
+        <div className="flex flex-col items-center gap-4">
+          <div ref={containerRef} className="w-[400px] h-[400px]" />
+          <p className="text-white text-lg font-medium animate-pulse">
+            Genererar presentation...
+          </p>
+        </div>
       </div>
     </div>
   );
