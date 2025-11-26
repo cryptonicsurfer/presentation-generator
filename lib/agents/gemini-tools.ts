@@ -14,7 +14,8 @@ function getFbgAnalyticsPool(): Pool {
   if (!fbgAnalyticsPool) {
     fbgAnalyticsPool = new Pool({
       connectionString: process.env.DATABASE_URL_FBG_ANALYTICS,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
+      // SSL disabled - connection string includes ?sslmode=disable
+      ssl: false,
     });
   }
   return fbgAnalyticsPool;
