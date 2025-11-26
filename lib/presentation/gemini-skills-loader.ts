@@ -2,19 +2,19 @@ import { readFile } from 'fs/promises';
 import { join } from 'path';
 
 /**
- * Load skills from the existing Claude Code setup
+ * Load skills from lib/skills directory (committed to git)
  */
 export async function loadSkills() {
-  const skillsBasePath = '/Users/paulklinteby/presentation-generator/.claude/skills';
+  const skillsBasePath = join(process.cwd(), 'lib', 'skills');
 
   try {
     const fbgPostgresSkill = await readFile(
-      join(skillsBasePath, 'fbg-postgres', 'SKILL.md'),
+      join(skillsBasePath, 'fbg-postgres.md'),
       'utf-8'
     );
 
     const directusCmsSkill = await readFile(
-      join(skillsBasePath, 'directus-cms', 'SKILL.md'),
+      join(skillsBasePath, 'directus-cms.md'),
       'utf-8'
     );
 
