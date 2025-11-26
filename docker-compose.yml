@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  presentation-generator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: presentation-generator
+    ports:
+      - "3000:3000"
+    environment:
+      # PostgreSQL Database URLs
+      - DATABASE_URL_FBG_ANALYTICS=${DATABASE_URL_FBG_ANALYTICS}
+      - DATABASE_URL_SCB_DATA=${DATABASE_URL_SCB_DATA}
+      - DATABASE_URL_FOOD_PRODUCTION=${DATABASE_URL_FOOD_PRODUCTION}
+
+      # Directus CMS
+      - DIRECTUS_URL=${DIRECTUS_URL}
+      - DIRECTUS_ACCESS_TOKEN=${DIRECTUS_ACCESS_TOKEN}
+
+      # App URL
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-https://presgen.businessfalkenberg.se}
+
+      # AI API Keys (Anthropic is optional)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+
+      # Model Configuration (Claude models omitted if no Anthropic key)
+      - GEMINI_MODELS=${GEMINI_MODELS:-gemini-2.5-flash,gemini-3-pro-preview}
+      - CLAUDE_MODELS=${CLAUDE_MODELS:-}
+
+    env_file:
+      - .env.local
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/models"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    networks:
+      - presentation-network
+
+networks:
+  presentation-network:
+    driver: bridge
