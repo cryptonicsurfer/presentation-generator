@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 
 export function FalconSpinner() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const cleanupRef = useRef<() => void>();
+  const cleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
