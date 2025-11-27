@@ -53,7 +53,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --system --gid 1001 nodejs
-RUN useradd --system --uid 1001 nextjs
+RUN useradd --system --uid 1001 --create-home nextjs
 
 # Copy necessary files
 COPY --from=builder /app/public ./public
@@ -61,14 +61,15 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 # Copy node_modules for playwright (needed for browser install)
-COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
 
-# Install Playwright Chromium browser
-RUN npx playwright install chromium
+# Set Playwright browser path to a shared location
+ENV PLAYWRIGHT_BROWSERS_PATH=/app/.playwright-browsers
 
-# Change ownership of playwright cache to nextjs user
-RUN chown -R nextjs:nodejs /root/.cache || true
-RUN mkdir -p /home/nextjs/.cache && chown -R nextjs:nodejs /home/nextjs
+# Install Playwright Chromium browser as root (before switching user)
+RUN mkdir -p /app/.playwright-browsers && \
+    npx playwright install chromium && \
+    chown -R nextjs:nodejs /app/.playwright-browsers
 
 USER nextjs
 
