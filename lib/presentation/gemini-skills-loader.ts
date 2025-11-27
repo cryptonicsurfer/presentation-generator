@@ -538,9 +538,16 @@ IMPORTANT:
 - Do NOT include title slide or thank you slide in sections (they're added automatically)
 - CREATE 10-15 CONTENT SLIDES (not just 3-4!)
 - ⚠️ Each section MUST include <img src="{{LOGO_SVART}}" alt="Falkenbergs kommun" class="slide-logo">
-- Use escaped quotes (\\\") in JSON
 - Ensure all HTML is valid and well-formed
 - Include trend slides, comparison tables, and analytical insights
+
+⚠️ CRITICAL JSON FORMATTING:
+- ALL double quotes inside HTML strings MUST be escaped as \\"
+- Quotes in Swedish text like "Hela vägen" become \\"Hela vägen\\"
+- Quotes in HTML attributes like class="slide" become class=\\"slide\\"
+- Use single quotes (') for Swedish text when possible to avoid escaping
+- Example: Instead of "Hela vägen"-konceptet, write 'Hela vägen'-konceptet
+- Alternative: Use HTML entities &quot; instead of \\" if needed
 
 # Example Query Flow for Company Report
 

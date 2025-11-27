@@ -11,6 +11,7 @@ import { getDefaultModel } from '@/lib/config/models';
 import { writeFileSync } from 'fs';
 import { join } from 'path';
 import { createWorkspace, readHtml, saveMetadata } from '@/lib/workspace';
+import { jsonrepair } from 'jsonrepair';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300; // 5 minutes for complex presentations
@@ -208,19 +209,33 @@ async function generateWithGemini(
     if (jsonMatch) {
       let jsonStr = jsonMatch[1] || jsonMatch[0];
 
-      // Try to parse - if it fails, we'll catch it below
+      // Try to parse - if it fails, we'll use jsonrepair
       try {
         presentationData = JSON.parse(jsonStr);
       } catch (parseError) {
-        // JSON parse failed - try cleaning approach as fallback
-        console.log('Initial JSON parse failed, trying to extract and fix...', parseError);
+        // JSON parse failed - use jsonrepair to fix common issues
+        console.log('Initial JSON parse failed, using jsonrepair...', parseError);
 
-        // Try to find just the object part more carefully
-        const objMatch = jsonStr.match(/(\{[\s\S]*\})/);
-        if (objMatch) {
-          presentationData = JSON.parse(objMatch[1]);
-        } else {
-          throw parseError; // Re-throw if we can't fix it
+        try {
+          // jsonrepair can fix unescaped quotes, missing commas, etc.
+          const repairedJson = jsonrepair(jsonStr);
+          presentationData = JSON.parse(repairedJson);
+          console.log('JSON successfully repaired!');
+        } catch (repairError) {
+          console.log('jsonrepair failed, trying to extract object...', repairError);
+
+          // Last resort: try to find just the object part more carefully
+          const objMatch = jsonStr.match(/(\{[\s\S]*\})/);
+          if (objMatch) {
+            try {
+              const repairedObj = jsonrepair(objMatch[1]);
+              presentationData = JSON.parse(repairedObj);
+            } catch {
+              throw parseError; // Re-throw original error if nothing works
+            }
+          } else {
+            throw parseError;
+          }
         }
       }
 
