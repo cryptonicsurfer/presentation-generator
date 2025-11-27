@@ -1,9 +1,9 @@
 # Multi-stage build for optimal image size
-FROM node:20-alpine AS base
+# Use Debian-based image for Playwright compatibility
+FROM node:20-slim AS base
 
 # Install dependencies only when needed
 FROM base AS deps
-RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # Copy package files
@@ -30,13 +30,45 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+# Install Playwright system dependencies
+RUN apt-get update && apt-get install -y \
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libdbus-1-3 \
+    libxkbcommon0 \
+    libatspi2.0-0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
+    libpango-1.0-0 \
+    libcairo2 \
+    fonts-liberation \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd --system --gid 1001 nodejs
+RUN useradd --system --uid 1001 nextjs
 
 # Copy necessary files
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# Copy node_modules for playwright (needed for browser install)
+COPY --from=deps /app/node_modules ./node_modules
+
+# Install Playwright Chromium browser
+RUN npx playwright install chromium
+
+# Change ownership of playwright cache to nextjs user
+RUN chown -R nextjs:nodejs /root/.cache || true
+RUN mkdir -p /home/nextjs/.cache && chown -R nextjs:nodejs /home/nextjs
 
 USER nextjs
 
