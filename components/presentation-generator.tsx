@@ -828,12 +828,13 @@ export default function PresentationGenerator() {
                             </CardDescription>
                           </div>
                           <Button
-                            variant="ghost"
+                            variant="outline"
                             size="sm"
-                            onClick={() => { setMode(null); setPrompt(''); }}
+                            onClick={() => { setMode(null); setPrompt(''); setUploadedFile(null); }}
                             disabled={isGenerating}
+                            className="text-muted-foreground hover:text-foreground"
                           >
-                            Byt typ
+                            ← Tillbaka
                           </Button>
                         </div>
                       </CardHeader>
@@ -942,6 +943,28 @@ export default function PresentationGenerator() {
                                 </p>
                               </div>
                             )}
+                          </div>
+                        )}
+
+                        {/* Model selector for company mode */}
+                        {mode === 'company' && availableModels.length > 0 && (
+                          <div className="space-y-2">
+                            <label className="text-sm text-muted-foreground">Välj AI-modell:</label>
+                            <Select value={selectedModel} onValueChange={setSelectedModel} disabled={isGenerating}>
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Välj modell" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {availableModels.map((model) => (
+                                  <SelectItem key={model.id} value={model.id}>
+                                    <div className="flex flex-col">
+                                      <span>{model.name}</span>
+                                      <span className="text-xs text-muted-foreground">{model.description}</span>
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </div>
                         )}
 
