@@ -36,38 +36,74 @@ export function SlideThumbnail({
     const doc = iframe.contentDocument || iframe.contentWindow?.document;
     if (!doc) return;
 
-    // Write full HTML to iframe
+    // Create a CSS rule that specifically shows only the target slide
+    // This uses high specificity and !important to override all other rules
+    const escapedId = CSS.escape(slide.id);
+    console.log(`[Thumbnail] CSS selector for slide "${slide.id}" → "#${escapedId}"`);
+
+    const thumbnailStyles = `
+      <style id="thumbnail-override">
+        /* Hide ALL slides by default */
+        .slide { display: none !important; }
+        .slide.active { display: none !important; }
+
+        /* Only show the target slide */
+        #${escapedId} { display: flex !important; }
+
+        /* Hide navigation UI */
+        .navigation, .fixed, button, #prev-btn, #next-btn { display: none !important; }
+        .fixed.bottom-8, .fixed.top-8 { display: none !important; }
+      </style>
+    `;
+
+    // Remove the navigation script that interferes with slide visibility
+    // and inject our custom styles before </head>
+    let cleanedHtml = fullHtml
+      // Remove the main navigation script block
+      .replace(/<script>\s*\(function\s*\(\)\s*\{[\s\S]*?\}\)\(\);\s*<\/script>/g, '')
+      // Inject our thumbnail-specific styles right before </head>
+      .replace('</head>', `${thumbnailStyles}</head>`);
+
+    // Write cleaned HTML to iframe
     doc.open();
-    doc.write(fullHtml);
+    doc.write(cleanedHtml);
     doc.close();
 
-    // Wait for iframe to load
-    iframe.onload = () => {
+    // Also apply via JavaScript as a fallback (some browsers need this)
+    const applyStyles = () => {
       const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
       if (!iframeDoc) return;
 
-      // Hide all slides except the target one
+      // Debug: log what we're looking for
       const allSlides = iframeDoc.querySelectorAll('.slide');
+      const slideIds = Array.from(allSlides).map(s => s.id);
+      console.log(`[Thumbnail] Looking for slide: "${slide.id}", found slides:`, slideIds);
+
+      // Double-check: apply inline styles to be absolutely sure
+      let foundTarget = false;
       allSlides.forEach((s) => {
+        const el = s as HTMLElement;
         if (s.id === slide.id) {
-          (s as HTMLElement).style.display = 'flex';
-          (s as HTMLElement).classList.add('active');
+          el.style.setProperty('display', 'flex', 'important');
+          foundTarget = true;
         } else {
-          (s as HTMLElement).style.display = 'none';
+          el.style.setProperty('display', 'none', 'important');
         }
       });
 
-      // Hide navigation controls
-      const navControls = iframeDoc.querySelectorAll('.navigation, .fixed, button');
-      navControls.forEach((el) => {
-        (el as HTMLElement).style.display = 'none';
-      });
+      if (!foundTarget) {
+        console.warn(`[Thumbnail] WARNING: Target slide "${slide.id}" not found in iframe!`);
+      }
 
       // Initialize Lucide icons if available
       if (iframe.contentWindow && (iframe.contentWindow as any).lucide) {
         (iframe.contentWindow as any).lucide.createIcons();
       }
     };
+
+    // Apply styles after a delay to ensure DOM and external resources are ready
+    // 200ms gives time for doc.write() to complete and DOM to be parsed
+    setTimeout(applyStyles, 200);
   }, [slide.id, fullHtml]);
 
   return (

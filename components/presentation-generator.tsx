@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Download, Eye, Maximize2, FileJson, Sparkles } from 'lucide-react';
+import { Loader2, Download, Eye, Maximize2, FileJson, Sparkles, Upload, X, FileText } from 'lucide-react';
 import type { ModelInfo } from '@/app/api/models/route';
 import { formatCost, calculateCost } from '@/lib/pricing';
 import { ChatInterface, type Message } from './chat-interface';
@@ -63,7 +63,11 @@ function ShimmerContainer({ active, radius = '1.5rem', className, wrapperClassNa
   );
 }
 
+// Presentation mode types
+type PresentationMode = 'company' | 'yearplan' | null;
+
 export default function PresentationGenerator() {
+  const [mode, setMode] = useState<PresentationMode>(null);
   const [prompt, setPrompt] = useState('');
   const [availableModels, setAvailableModels] = useState<ModelInfo[]>([]);
   const [selectedModel, setSelectedModel] = useState<string>('');
@@ -81,15 +85,28 @@ export default function PresentationGenerator() {
   const [thinkingLevel, setThinkingLevel] = useState<'low' | 'high' | 'off'>('off');
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [pdfProgress, setPdfProgress] = useState(0);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const statusScrollRef = useRef<HTMLDivElement>(null);
 
-  const examplePrompts = [
+  // Mode-specific example prompts
+  const companyExamplePrompts = [
     'Skapa en företagsrapport för Randek AB',
     'KPI-översikt för Falkenberg Q4 2024',
     'Gör en presentation med finansiell data från vår databas och kontakter och möten från crm-systemet om företaget:',
   ];
+
+  const yearplanExamplePrompts = [
+    'Skapa en presentation för verksamhetsplanen H1 2026',
+    'Visa alla aktiviteter för Q2 2026',
+    'Sammanfatta statusen på alla planerade aktiviteter 2026',
+    'Vilka aktiviteter är beslutade men inte genomförda?',
+  ];
+
+  const examplePrompts = mode === 'yearplan' ? yearplanExamplePrompts : companyExamplePrompts;
 
   const exampleTweakPrompts = [
     'Byt ut till bokslut 2024 istället för 2023',
@@ -132,18 +149,36 @@ export default function PresentationGenerator() {
     setPresentationData(null);
     setMessages([]); // Reset chat history on new generation
 
+    // Choose endpoint based on mode
+    const endpoint = mode === 'yearplan' ? '/api/generate-yearplan' : '/api/generate';
+
     try {
-      const response = await fetch('/api/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          prompt,
-          model: selectedModel,
-          thinkingLevel: thinkingLevel !== 'off' ? thinkingLevel : undefined
-        }),
-      });
+      let response: Response;
+
+      // Use FormData for yearplan mode with file, otherwise JSON
+      if (mode === 'yearplan' && uploadedFile) {
+        const formData = new FormData();
+        formData.append('prompt', prompt);
+        formData.append('file', uploadedFile);
+
+        response = await fetch(endpoint, {
+          method: 'POST',
+          body: formData,
+        });
+      } else {
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            prompt,
+            // Only send model for company mode
+            ...(mode === 'company' && { model: selectedModel }),
+            ...(mode === 'company' && thinkingLevel !== 'off' && { thinkingLevel }),
+          }),
+        });
+      }
 
       if (!response.ok) {
         throw new Error('Failed to generate presentation');
@@ -441,6 +476,7 @@ export default function PresentationGenerator() {
 
       // Extract slides for selection
       const extractedSlides = extractSlides(generatedHTML);
+      console.log('[PresentationGenerator] Extracted slides:', extractedSlides.map(s => ({ id: s.id, index: s.index, title: s.title?.substring(0, 30) })));
       setSlides(extractedSlides);
       // Reset selection when new presentation is generated
       setSelectedSlideIds([]);
@@ -695,130 +731,262 @@ export default function PresentationGenerator() {
           <div className="xl:col-span-2 flex flex-col gap-6 h-full overflow-hidden">
             {/* Top-left: Prompt Input OR Chat Interface */}
             {!generatedHTML ? (
-              /* STEP 1: Initial Prompt Input */
+              /* STEP 1: Mode Selection or Prompt Input */
               <ShimmerContainer active={shouldHighlightPrompt}>
                 <Card>
-                  <CardHeader>
-                    <CardTitle>Vad vill du skapa?</CardTitle>
-                    <CardDescription>
-                      Beskriv vilken presentation du vill generera
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {/* Model Selector */}
-                    <div className="flex gap-4">
-                      {/* AI Model Selector */}
-                      <div className="space-y-2 flex-1">
-                        <label className="text-sm font-medium text-foreground/80 dark:text-foreground">
-                          AI-modell
-                        </label>
-                        <Select
-                          value={selectedModel}
-                          onValueChange={setSelectedModel}
-                          disabled={isGenerating || availableModels.length === 0}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Välj AI-modell" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {availableModels.map((model) => (
-                              <SelectItem key={model.id} value={model.id}>
-                                <div className="flex flex-col items-start">
-                                  <span className="font-medium">{model.name}</span>
-                                  <span className="text-xs text-muted-foreground">{model.description}</span>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {/* Thinking Level Selector - only for Gemini 3 Pro Preview */}
-                      {selectedModel === 'gemini-3-pro-preview' && (
-                        <div className="space-y-2 flex-1">
-                          <label className="text-sm font-medium text-foreground/80 dark:text-foreground flex items-center gap-2">
-                            <Sparkles className="w-4 h-4" />
-                            Thinking Mode
-                          </label>
-                          <Select
-                            value={thinkingLevel}
-                            onValueChange={(value) => setThinkingLevel(value as 'low' | 'high' | 'off')}
-                            disabled={isGenerating}
+                  {!mode ? (
+                    /* MODE SELECTION */
+                    <>
+                      <CardHeader>
+                        <CardTitle>Vad vill du skapa?</CardTitle>
+                        <CardDescription>
+                          Välj typ av presentation
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="grid grid-cols-1 gap-4">
+                          {/* Company Presentation Button */}
+                          <button
+                            onClick={() => setMode('company')}
+                            className="group relative flex flex-col items-start p-6 rounded-xl border-2 border-border/50 hover:border-[#1f4e99] hover:bg-[#1f4e99]/5 transition-all duration-200"
                           >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Välj thinking level" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="off">
-                                <div className="flex flex-col items-start">
-                                  <span className="font-medium">Off</span>
-                                  <span className="text-xs text-muted-foreground">Standard generation (no thinking)</span>
-                                </div>
-                              </SelectItem>
-                              <SelectItem value="low">
-                                <div className="flex flex-col items-start">
-                                  <span className="font-medium">Low</span>
-                                  <span className="text-xs text-muted-foreground">Basic reasoning steps</span>
-                                </div>
-                              </SelectItem>
-                              <SelectItem value="high">
-                                <div className="flex flex-col items-start">
-                                  <span className="font-medium">High</span>
-                                  <span className="text-xs text-muted-foreground">Detailed thought process</span>
-                                </div>
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
+                            <div className="flex items-center gap-3 mb-2">
+                              <div className="p-2 rounded-lg bg-[#1f4e99]/10 text-[#1f4e99]">
+                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                </svg>
+                              </div>
+                              <span className="text-xl font-semibold text-foreground">Företagspresentation</span>
+                            </div>
+                            <p className="text-sm text-muted-foreground text-left">
+                              Skapa rapporter om företag med finansiell data, CRM-information och möteshistorik
+                            </p>
+                            <div className="mt-3 flex flex-wrap gap-1.5">
+                              <Badge variant="secondary" className="text-xs">Finansdata</Badge>
+                              <Badge variant="secondary" className="text-xs">CRM</Badge>
+                              <Badge variant="secondary" className="text-xs">Bokslut</Badge>
+                            </div>
+                          </button>
+
+                          {/* Year Plan Presentation Button */}
+                          <button
+                            onClick={() => setMode('yearplan')}
+                            className="group relative flex flex-col items-start p-6 rounded-xl border-2 border-border/50 hover:border-[#52ae32] hover:bg-[#52ae32]/5 transition-all duration-200"
+                          >
+                            <div className="flex items-center gap-3 mb-2">
+                              <div className="p-2 rounded-lg bg-[#52ae32]/10 text-[#52ae32]">
+                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                              </div>
+                              <span className="text-xl font-semibold text-foreground">Verksamhetsplan</span>
+                            </div>
+                            <p className="text-sm text-muted-foreground text-left">
+                              Visualisera verksamhetsplanen med aktiviteter, tidslinjer och statusöversikter
+                            </p>
+                            <div className="mt-3 flex flex-wrap gap-1.5">
+                              <Badge variant="secondary" className="text-xs">Aktiviteter</Badge>
+                              <Badge variant="secondary" className="text-xs">Tidslinje</Badge>
+                              <Badge variant="secondary" className="text-xs">Fokusområden</Badge>
+                            </div>
+                          </button>
                         </div>
-                      )}
-                    </div>
-
-                    <Textarea
-                      placeholder="Exempel: Skapa en företagsrapport för Randek AB med senaste finansiella data och möteshistorik..."
-                      value={prompt}
-                      onChange={(e) => setPrompt(e.target.value)}
-                      rows={6}
-                      className="resize-none"
-                      disabled={isGenerating}
-                    />
-
-                    <div className="space-y-2">
-                      <p className="text-sm text-muted-foreground">Exempel på prompts:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {examplePrompts.map((example, i) => (
+                      </CardContent>
+                    </>
+                  ) : (
+                    /* PROMPT INPUT (after mode is selected) */
+                    <>
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <CardTitle className="flex items-center gap-2">
+                              {mode === 'company' ? (
+                                <>
+                                  <div className="p-1.5 rounded-md bg-[#1f4e99]/10 text-[#1f4e99]">
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                    </svg>
+                                  </div>
+                                  Företagspresentation
+                                </>
+                              ) : (
+                                <>
+                                  <div className="p-1.5 rounded-md bg-[#52ae32]/10 text-[#52ae32]">
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg>
+                                  </div>
+                                  Verksamhetsplan
+                                </>
+                              )}
+                            </CardTitle>
+                            <CardDescription>
+                              {mode === 'company'
+                                ? 'Beskriv vilken företagsrapport du vill generera'
+                                : 'Beskriv vilken verksamhetsplan du vill visualisera'
+                              }
+                            </CardDescription>
+                          </div>
                           <Button
-                            key={i}
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
-                            onClick={() => setPrompt(example)}
+                            onClick={() => { setMode(null); setPrompt(''); }}
                             disabled={isGenerating}
-                            className="line-clamp-2"
                           >
-                            {example}
+                            Byt typ
                           </Button>
-                        ))}
-                      </div>
-                    </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <Textarea
+                          placeholder={mode === 'company'
+                            ? "Exempel: Skapa en företagsrapport för Randek AB med senaste finansiella data och möteshistorik..."
+                            : "Exempel: Skapa en presentation för verksamhetsplanen H1 2026..."
+                          }
+                          value={prompt}
+                          onChange={(e) => setPrompt(e.target.value)}
+                          rows={6}
+                          className="resize-none"
+                          disabled={isGenerating}
+                        />
 
-                    <Button
-                      onClick={handleGenerate}
-                      disabled={isGenerating || !prompt.trim()}
-                      className="w-full"
-                      size="lg"
-                    >
-                      {isGenerating ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Genererar...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="w-4 h-4" />
-                          Generera Presentation
-                        </>
-                      )}
-                    </Button>
-                  </CardContent>
+                        {/* File Upload for Year Plan mode */}
+                        {mode === 'yearplan' && (
+                          <div className="space-y-2">
+                            <p className="text-sm text-muted-foreground">
+                              Ladda upp verksamhetsplan (valfritt):
+                            </p>
+                            <input
+                              ref={fileInputRef}
+                              type="file"
+                              accept=".pdf,.docx,.doc"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  // Validate file size (10MB max)
+                                  if (file.size > 10 * 1024 * 1024) {
+                                    alert('Filen är för stor. Max storlek är 10 MB.');
+                                    return;
+                                  }
+                                  setUploadedFile(file);
+                                }
+                              }}
+                              className="hidden"
+                              disabled={isGenerating}
+                            />
+
+                            {uploadedFile ? (
+                              <div className="flex items-center gap-3 p-3 bg-[#52ae32]/10 border border-[#52ae32]/30 rounded-lg">
+                                <FileText className="w-5 h-5 text-[#52ae32]" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium truncate">{uploadedFile.name}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {(uploadedFile.size / 1024).toFixed(0)} KB
+                                  </p>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setUploadedFile(null);
+                                    if (fileInputRef.current) {
+                                      fileInputRef.current.value = '';
+                                    }
+                                  }}
+                                  disabled={isGenerating}
+                                  className="shrink-0"
+                                >
+                                  <X className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <div
+                                onClick={() => !isGenerating && fileInputRef.current?.click()}
+                                onDragOver={(e) => {
+                                  e.preventDefault();
+                                  setIsDragOver(true);
+                                }}
+                                onDragLeave={() => setIsDragOver(false)}
+                                onDrop={(e) => {
+                                  e.preventDefault();
+                                  setIsDragOver(false);
+                                  const file = e.dataTransfer.files[0];
+                                  if (file) {
+                                    const ext = file.name.toLowerCase().split('.').pop();
+                                    if (!['pdf', 'docx', 'doc'].includes(ext || '')) {
+                                      alert('Endast PDF och DOCX-filer stöds.');
+                                      return;
+                                    }
+                                    if (file.size > 10 * 1024 * 1024) {
+                                      alert('Filen är för stor. Max storlek är 10 MB.');
+                                      return;
+                                    }
+                                    setUploadedFile(file);
+                                  }
+                                }}
+                                className={`
+                                  flex flex-col items-center justify-center p-4 border-2 border-dashed rounded-lg cursor-pointer transition-colors
+                                  ${isDragOver
+                                    ? 'border-[#52ae32] bg-[#52ae32]/10'
+                                    : 'border-border/50 hover:border-[#52ae32]/50 hover:bg-[#52ae32]/5'
+                                  }
+                                  ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}
+                                `}
+                              >
+                                <Upload className="w-6 h-6 text-muted-foreground mb-2" />
+                                <p className="text-sm text-muted-foreground text-center">
+                                  Dra och släpp eller klicka för att välja fil
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  PDF, DOCX (max 10 MB)
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="space-y-2">
+                          <p className="text-sm text-muted-foreground">Exempel på prompts:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {examplePrompts.map((example, i) => (
+                              <Button
+                                key={i}
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setPrompt(example)}
+                                disabled={isGenerating}
+                                className="line-clamp-2 text-left h-auto py-2"
+                              >
+                                {example}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <Button
+                          onClick={handleGenerate}
+                          disabled={isGenerating || !prompt.trim()}
+                          className="w-full"
+                          size="lg"
+                          style={{
+                            backgroundColor: mode === 'yearplan' ? '#52ae32' : undefined,
+                          }}
+                        >
+                          {isGenerating ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Genererar...
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-4 h-4" />
+                              Generera Presentation
+                            </>
+                          )}
+                        </Button>
+                      </CardContent>
+                    </>
+                  )}
                 </Card>
               </ShimmerContainer>
             ) : (

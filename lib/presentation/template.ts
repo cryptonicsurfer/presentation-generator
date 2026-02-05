@@ -40,14 +40,21 @@ export function generatePresentationHTML(title: string, sections: string[]): str
     }
 
     // Inject unique ID if not present
-    // We use index + 1 because title slide will be slide-0 (or we can make title slide slide-1)
-    // Let's make Title = slide-0, Content = slide-1..N, Thank You = slide-N+1
-    // But here 'sections' are just the content slides.
-    // The actual full list is assembled in the route handler usually.
-    // Wait, the route handler calls generatePresentationHTML with the FULL list including title/thankyou.
-    // Let's just inject IDs based on the loop index.
-    if (!cleaned.includes('id="slide-')) {
-      cleaned = cleaned.replace(/<section class="slide/, `<section id="slide-${index}" class="slide`);
+    // Handle both double quotes (class="slide") and single quotes (class='slide')
+    if (!cleaned.includes('id="slide-') && !cleaned.includes("id='slide-")) {
+      // Try double quotes first, then single quotes
+      if (cleaned.includes('<section class="slide')) {
+        cleaned = cleaned.replace(/<section class="slide/, `<section id="slide-${index}" class="slide`);
+        console.log(`[Template] Section ${index}: Injected id="slide-${index}" (double quotes)`);
+      } else if (cleaned.includes("<section class='slide")) {
+        cleaned = cleaned.replace(/<section class='slide/, `<section id="slide-${index}" class='slide`);
+        console.log(`[Template] Section ${index}: Injected id="slide-${index}" (single quotes)`);
+      } else {
+        console.warn(`[Template] Section ${index}: Could not inject ID - no matching pattern found!`);
+        console.warn(`[Template] Section ${index} starts with:`, cleaned.substring(0, 100));
+      }
+    } else {
+      console.log(`[Template] Section ${index}: Already has ID`);
     }
 
     const after = cleaned.length;
@@ -122,7 +129,7 @@ export function generatePresentationHTML(title: string, sections: string[]): str
 
         .slide {
             height: 100vh;
-            display: none;
+            display: none !important;
             scroll-snap-align: start;
             position: relative;
         }
@@ -137,7 +144,7 @@ export function generatePresentationHTML(title: string, sections: string[]): str
         }
 
         .slide.active {
-            display: flex;
+            display: flex !important;
         }
 
         @page {

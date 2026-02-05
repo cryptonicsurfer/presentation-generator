@@ -158,11 +158,18 @@ export async function POST(request: NextRequest) {
     // }
     console.log('[export-pdf] Temp HTML saved for debugging:', tempHtmlPath);
 
+    // Sanitize filename for HTTP headers (ASCII only for filename, UTF-8 for filename*)
+    // RFC 5987 allows UTF-8 filenames via filename*= parameter
+    const sanitizedFilename = filename
+      .replace(/[^\x20-\x7E]/g, '_')  // Replace non-ASCII with underscore
+      .replace(/"/g, "'");             // Replace quotes with single quotes
+    const utf8Filename = encodeURIComponent(filename);
+
     // Return PDF as download
     return new NextResponse(new Uint8Array(pdfBuffer), {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Disposition': `attachment; filename="${sanitizedFilename}"; filename*=UTF-8''${utf8Filename}`,
         'Content-Length': pdfBuffer.length.toString(),
       },
     });
