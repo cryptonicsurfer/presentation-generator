@@ -60,6 +60,10 @@ function getClaudeModelInfo(modelId: string): ModelInfo | null {
 
 function getGeminiModelInfo(modelId: string): ModelInfo | null {
   const modelMap: Record<string, { name: string; description: string }> = {
+    'gemini-3-flash-preview': {
+      name: 'Gemini 3.0 Flash Preview',
+      description: 'Snabb och kostnadseffektiv (Recommended)'
+    },
     'gemini-2.5-flash': {
       name: 'Gemini 2.5 Flash',
       description: 'Snabbast och billigast'
@@ -70,7 +74,7 @@ function getGeminiModelInfo(modelId: string): ModelInfo | null {
     },
     'gemini-3-pro-preview': {
       name: 'Gemini 3.0 Pro Preview',
-      description: 'Experimentell - mest kraftfull Gemini'
+      description: 'Mest kraftfull men långsammare'
     },
     // Legacy naming (deprecated)
     'gemini-flash-latest': {

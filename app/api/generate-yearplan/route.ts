@@ -14,6 +14,7 @@ import { generateYearPlanSystemPrompt } from '@/lib/presentation/yearplan-skills
 import { generatePresentationHTML, generateTitleSlide, generateThankYouSlide } from '@/lib/presentation/template';
 import { calculateCost } from '@/lib/pricing';
 import { parseFile, truncateContent, MAX_FILE_SIZE } from '@/lib/file-parser';
+import { getDefaultGeminiModel } from '@/lib/config/models';
 import { writeFileSync } from 'fs';
 import { join } from 'path';
 import { jsonrepair } from 'jsonrepair';
@@ -21,8 +22,8 @@ import { jsonrepair } from 'jsonrepair';
 export const runtime = 'nodejs';
 export const maxDuration = 180; // 3 minutes to allow for file parsing
 
-// Fixed model for year plan presentations
-const YEARPLAN_MODEL = 'gemini-3-flash-preview';
+// Use first Gemini model from GEMINI_MODELS env (allows Google to rename without code changes)
+const YEARPLAN_MODEL = getDefaultGeminiModel();
 
 export async function POST(req: NextRequest) {
   const encoder = new TextEncoder();
