@@ -73,10 +73,11 @@ export function generatePresentationHTML(title: string, sections: string[]): str
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${title} - Falkenberg Kommun</title>
     <!-- Script tags removed from ${totalScriptsRemoved} sections to prevent conflicts -->
-    <!-- Supply-chain hardening (2026-05-20): version-pinned + SRI where CORS allows.
-         Tailwind Play CDN doesn't send CORS so version-pin only.
-         To upgrade: curl -sL <url> | openssl dgst -sha384 -binary | openssl base64 -A -->
-    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+    <!-- Tailwind self-hosted from /public/cdn/ (Next.js serves at root path).
+         Same-origin → SRI works without crossorigin. Eliminates CDN dependency.
+         To upgrade lucide/chart.js (which are still CDN-hosted with SRI):
+           curl -sL <url> | openssl dgst -sha384 -binary | openssl base64 -A -->
+    <script src="/cdn/tailwind-3.4.17.js" integrity="sha384-igm5BeiBt36UU4gqwWS7imYmelpTsZlQ45FZf+XBn9MuJbn4nQr7yx1yFydocC/K"></script>
     <script src="https://unpkg.com/lucide@1.16.0/dist/umd/lucide.min.js" integrity="sha384-ZgnJ3Zpr70Xoify35DjOZWqHib1iYJBpYpQUIEpDASG9+fJ745WzNQuC004dwU0W" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
