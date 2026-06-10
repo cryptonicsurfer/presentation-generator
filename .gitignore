@@ -43,3 +43,5 @@ next-env.d.ts
 # application logs and workspaces (may contain sensitive data)
 /public/logs
 /public/workspaces
+# transient PDF-export scratch files (recreated at runtime via mkdir)
+/public/temp
