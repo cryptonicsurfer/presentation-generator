@@ -12,7 +12,10 @@ services:
     restart: unless-stopped
 
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3000/api/models').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))\""]
+      # Probe the unauthenticated root. /api/* is gated behind Directus auth and
+      # returns 401, so treat "server responds without a 5xx" as healthy — a 307
+      # auth-redirect means the app is up. Only connection errors / 5xx fail.
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3000/').then(r => process.exit(r.status < 500 ? 0 : 1)).catch(() => process.exit(1))\""]
       interval: 30s
       timeout: 10s
       retries: 3
