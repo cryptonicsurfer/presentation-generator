@@ -110,6 +110,28 @@ export class MistralAgent {
     this.client = new Mistral({ apiKey: this.config.apiKey });
   }
 
+  /** chat.complete with retry-on-429. A tokens-per-minute burst shouldn't kill
+   * a whole generation — back off and retry a few times before giving up. */
+  private async complete(args: any, callback?: GeminiAgentCallback): Promise<any> {
+    const delaysMs = [2000, 5000, 10000];
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await this.client.chat.complete(args);
+      } catch (error: any) {
+        const status = error?.statusCode ?? error?.status;
+        const is429 = status === 429 || /rate.?limit|\b429\b/i.test(error?.message || '');
+        if (is429 && attempt < delaysMs.length) {
+          const wait = delaysMs[attempt];
+          console.warn(`[MistralAgent] 429 rate-limited, retrying in ${wait}ms (attempt ${attempt + 1})`);
+          callback?.({ type: 'status', message: `Mistral hastighetsbegränsad, väntar ${wait / 1000}s...` });
+          await new Promise((r) => setTimeout(r, wait));
+          continue;
+        }
+        throw error;
+      }
+    }
+  }
+
   async run(
     userPrompt: string,
     callback?: GeminiAgentCallback,
@@ -157,13 +179,13 @@ export class MistralAgent {
       try {
         console.log(`[MistralAgent] Turn ${turnCount}, messages: ${messages.length}`);
 
-        const response = await this.client.chat.complete({
+        const response = await this.complete({
           model: this.config.model,
           messages,
           tools: mistralTools,
           toolChoice: 'auto',
           maxTokens: 8192,
-        });
+        }, callback);
 
         const usage = response.usage;
         if (usage) {
@@ -249,12 +271,12 @@ export class MistralAgent {
           content:
             'You have reached the maximum number of tool calls. Based on all the data you have collected, NOW generate the final JSON output as instructed. Do not call any more tools.',
         });
-        const response = await this.client.chat.complete({
+        const response = await this.complete({
           model: this.config.model,
           messages,
           toolChoice: 'none',
           maxTokens: 8192,
-        });
+        }, callback);
         const usage = response.usage;
         if (usage) {
           totalInputTokens += usage.promptTokens || 0;
