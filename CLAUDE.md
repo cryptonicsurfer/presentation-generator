@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Next.js 16 presentation generator application using React 19, TypeScript, and Tailwind CSS v4. The project is intended to evolve into a web-based presentation workflow that uses the Claude Agent SDK to programmatically orchestrate Claude for generating presentations from database sources.
+This is a Next.js 16 presentation generator application using React 19, TypeScript, and Tailwind CSS v4. It is a working web-based presentation workflow that generates slide decks from database sources. It supports **three interchangeable AI backends** — the Claude Agent SDK, Google Gemini, and Mistral — selected per request by the model ID. Deployed on the VPS at `presgen.businessfalkenberg.se` (Docker, port 3000), behind Directus auth.
 
 ## Development Commands
 
@@ -91,33 +91,40 @@ The project now includes a fully functional web-based presentation generator:
 ### Architecture
 - **Frontend**: Next.js 16 App Router with React 19 and shadcn/ui
 - **Backend**: Next.js API routes with Server-Sent Events (SSE) streaming
-- **AI**: Claude Agent SDK with custom MCP tools
-- **Databases**: PostgreSQL (3 databases) + Directus CRM
+- **AI**: three backends, chosen per request by model-ID prefix (`claude-*` / `gemini-*` / `mistral-*`) in `/api/generate`. Default preference order is **Mistral → Gemini → Claude** (Mistral is EU-hosted and reliable while Google's tier has been flaky). Available models per provider come from the `CLAUDE_MODELS` / `GEMINI_MODELS` / `MISTRAL_MODELS` env vars (see `lib/config/models.ts`).
+- **Databases**: PostgreSQL + Directus CRM
+
+### Backends & output contract
+
+The three backends differ in *how* they produce the deck:
+
+- **Gemini & Mistral** (`lib/agents/gemini-agent.ts`, `lib/agents/mistral-agent.ts`) are tool-calling loops that share the system prompt from `lib/presentation/gemini-skills-loader.ts`. They return the deck as **plain text in a delimiter format** — `===TITLE===` / `===SLIDE===` / `===END===` — which needs NO escaping. ⚠️ This replaced the old "HTML-as-escaped-JSON-strings" contract, which Mistral couldn't emit reliably (invalid JSON). Do not reintroduce JSON for slide output.
+- **Claude** (`@anthropic-ai/claude-agent-sdk`) runs in a workspace and uses the **Write tool to save `presentation.html`** directly (prompt from `lib/presentation/skills-loader.ts`).
+- Parsing is unified in `parsePresentationOutput()` in `app/api/generate/route.ts`: delimiter format first, with a legacy-JSON fallback (jsonrepair) for safety. Mistral output is capped at `maxTokens: 16384` so 10–15-slide decks aren't truncated.
 
 ### Key Components
 
-#### MCP Tools (`lib/mcp/`)
-Secure server-side tools for database access:
-- `query_fbg_analytics` - Company financials, employment stats
-- `query_scb_data` - KPI data, economic indicators
-- `query_food_production` - Food production statistics
-- `search_directus_companies` - Company search in CRM
-- `count_directus_meetings` - Meeting count with proper junction table handling
-- `get_directus_contacts` - Contact person retrieval
-- `get_directus_tasks` - Open task retrieval
+#### MCP / agent tools
+Secure server-side DB tools, all provider-agnostic executors:
+- The **presentation agents** (Gemini/Mistral/Claude) use four: `query_fbg_analytics`, `search_directus_companies`, `analyze_meetings` (replaced the older `count_directus_meetings`), `get_directus_contacts`. Declared for Gemini/Mistral in `lib/agents/gemini-tools.ts`; exposed to Claude via the MCP server in `lib/mcp/`.
+- The **year-plan flow** (`/api/generate-yearplan`) adds `query_year_plan`, `get_year_plan_summary`, `get_focus_areas`, `get_group`, and uses `lib/file-parser/` (docx + Mistral OCR) for uploaded attachments.
 
 #### Presentation Template System (`lib/presentation/`)
-- HTML generation with Falkenberg's graphic profile
-- Tailwind CSS v4 with custom color palette
-- Lucide icons integration
-- Print-to-PDF support
-- Skills loaded from existing Claude Code setup
+- HTML generation with Falkenberg's graphic profile (`template.ts`)
+- Tailwind CSS v4 with custom color palette, Lucide icons, print-to-PDF
+- `slide-parser.ts` extracts/replaces individual `<section>` slides for targeted edits
 
-#### API Endpoint (`/api/generate`)
-- Accepts user prompts
-- Streams real-time progress updates
-- Generates complete HTML presentations
-- Returns downloadable files
+#### API routes (`app/api/`)
+- `generate` — main deck generation (the three-backend SSE endpoint above)
+- `generate-yearplan` — Århjul/year-plan deck with file-upload context
+- `tweak` / `tweak-slides` — targeted edits to an existing deck
+- `export-pdf` — server-side PDF render (Playwright/Chromium)
+- `models` — lists available models per provider (⚠️ auth-gated; not a health endpoint)
+- `auth` — Directus auth
+
+#### Auth & deployment
+- `/api/*` is gated behind Directus auth (`proxy.ts`) → returns 401 unauthenticated. The Docker healthcheck therefore probes `/` (accepts any non-5xx), not `/api/models`.
+- Deploy: `ssh glsfbg && cd ~/presentation-generator && git pull && docker compose up -d --build` (drop `--build` for compose-only changes).
 
 #### Frontend UI
 - Textarea for prompt input with example prompts
