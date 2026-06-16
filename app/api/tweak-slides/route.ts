@@ -1,7 +1,6 @@
 import { NextRequest } from 'next/server';
 import { extractSlides, replaceSlides, type Slide } from '@/lib/presentation/slide-parser';
-import { GeminiAgent } from '@/lib/agents/gemini-agent';
-import { geminiTools } from '@/lib/agents/gemini-tools';
+import { createToolAgent } from '@/lib/agents/agent-factory';
 import { logosToUrls, urlsToLogos } from '@/lib/presentation/logos';
 import { captureMultipleSlideScreenshots } from '@/lib/utils/screenshot';
 
@@ -181,10 +180,9 @@ Return a JSON array of updated slides:
 ]
 \`\`\``;
 
-        // Create Gemini agent
-        console.log('[tweak-slides] Creating Gemini agent with model:', model);
-        const agent = new GeminiAgent({
-          apiKey: process.env.GOOGLE_API_KEY!,
+        // Create tool agent (Gemini or Mistral, per model id)
+        console.log('[tweak-slides] Creating agent with model:', model);
+        const agent = createToolAgent({
           model,
           systemInstruction: systemPrompt,
           maxTurns: 10,

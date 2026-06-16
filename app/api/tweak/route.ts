@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { GeminiAgent } from '@/lib/agents/gemini-agent';
+import { createToolAgent, providerForModel } from '@/lib/agents/agent-factory';
 import { generateGeminiTweakPrompt } from '@/lib/presentation/gemini-skills-loader';
 import { generatePresentationHTML, generateTitleSlide, generateThankYouSlide } from '@/lib/presentation/template';
 import { calculateCost } from '@/lib/pricing';
@@ -30,17 +30,20 @@ export async function POST(req: NextRequest) {
           return;
         }
 
-        // Check for Google API key
-        if (!process.env.GOOGLE_API_KEY) {
+        // Resolve model + provider (request may pick Mistral or Gemini)
+        const model = body.model || getDefaultGeminiModel();
+        const provider = providerForModel(model);
+        const requiredKey = provider === 'mistral' ? 'MISTRAL_API_KEY' : 'GOOGLE_API_KEY';
+        if (!process.env[requiredKey]) {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({
             type: 'error',
-            message: 'GOOGLE_API_KEY not configured. Add it to .env.local'
+            message: `${requiredKey} not configured. Add it to .env.local`
           })}\n\n`));
           controller.close();
           return;
         }
 
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'status', message: 'Analyserar dina ändringar med Gemini...' })}\n\n`));
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'status', message: 'Analyserar dina ändringar...' })}\n\n`));
 
         // Reconstruct current HTML from presentation data
         const currentTitle = originalPresentationData.title || '';
@@ -87,13 +90,11 @@ export async function POST(req: NextRequest) {
         const hasVisualContext = screenshots && screenshots.length > 0;
         const systemPrompt = await generateGeminiTweakPrompt(history, currentHTML, currentTitle, hasVisualContext);
 
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'status', message: 'Ansluter till Gemini...' })}\n\n`));
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'status', message: 'Ansluter till AI...' })}\n\n`));
 
-        // Create Gemini agent
-        const model = getDefaultGeminiModel();
-        const agent = new GeminiAgent({
-          apiKey: process.env.GOOGLE_API_KEY,
-          model: model,
+        // Create tool agent (Gemini or Mistral, per model id)
+        const agent = createToolAgent({
+          model,
           systemInstruction: systemPrompt,
           maxTurns: 15, // Allow more turns if database queries needed
         });

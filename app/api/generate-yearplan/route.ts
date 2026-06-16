@@ -10,6 +10,8 @@
 import { NextRequest } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { yearPlanGeminiTools, executeYearPlanTool } from '@/lib/agents/yearplan-gemini-tools';
+import { MistralAgent } from '@/lib/agents/mistral-agent';
+import { providerForModel } from '@/lib/agents/agent-factory';
 import { generateYearPlanSystemPrompt } from '@/lib/presentation/yearplan-skills-loader';
 import { generatePresentationHTML, generateTitleSlide, generateThankYouSlide } from '@/lib/presentation/template';
 import { calculateCost } from '@/lib/pricing';
@@ -35,6 +37,7 @@ export async function POST(req: NextRequest) {
         let userPrompt: string;
         let uploadedFileContent: string | null = null;
         let uploadedFileName: string | null = null;
+        let requestedModel: string | null = null;
 
         const contentType = req.headers.get('content-type') || '';
 
@@ -42,6 +45,7 @@ export async function POST(req: NextRequest) {
           // FormData with potential file upload
           const formData = await req.formData();
           userPrompt = formData.get('prompt') as string;
+          requestedModel = (formData.get('model') as string) || null;
 
           const file = formData.get('file') as File | null;
           if (file && file.size > 0) {
@@ -84,6 +88,7 @@ export async function POST(req: NextRequest) {
           // Regular JSON request
           const body = await req.json();
           userPrompt = body.prompt;
+          requestedModel = body.model || null;
         }
 
         if (!userPrompt) {
@@ -92,11 +97,14 @@ export async function POST(req: NextRequest) {
           return;
         }
 
-        // Check for Google API key
-        if (!process.env.GOOGLE_API_KEY) {
+        // Resolve model + provider (request may pick Mistral; default stays Gemini)
+        const model = requestedModel || YEARPLAN_MODEL;
+        const provider = providerForModel(model);
+        const requiredKey = provider === 'mistral' ? 'MISTRAL_API_KEY' : 'GOOGLE_API_KEY';
+        if (!process.env[requiredKey]) {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({
             type: 'error',
-            message: 'GOOGLE_API_KEY not configured'
+            message: `${requiredKey} not configured`
           })}\n\n`));
           controller.close();
           return;
@@ -104,7 +112,7 @@ export async function POST(req: NextRequest) {
 
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({
           type: 'status',
-          message: 'Initierar Gemini 3 Flash...'
+          message: `Initierar ${provider === 'mistral' ? 'Mistral' : 'Gemini'}...`
         })}\n\n`));
 
         // Generate year plan specific system prompt (with optional file context)
@@ -115,9 +123,6 @@ export async function POST(req: NextRequest) {
           message: 'Ansluter till verksamhetsplaneringsdatabasen...'
         })}\n\n`));
 
-        // Initialize Gemini with year plan tools
-        const genAI = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY });
-
         // Tool name to user-friendly message mapping
         const toolMessages: Record<string, string> = {
           'query_year_plan': 'Hämtar aktiviteter från verksamhetsplanen...',
@@ -125,11 +130,39 @@ export async function POST(req: NextRequest) {
           'get_focus_areas': 'Hämtar fokusområden...',
         };
 
-        // Run Gemini agent loop
-        const toolCallsLog: any[] = [];
+        // Shared accumulators (filled by whichever provider runs below)
+        let toolCallsLog: any[] = [];
         let totalInputTokens = 0;
         let totalOutputTokens = 0;
         let finalResult = '';
+
+        if (provider === 'mistral') {
+          // Mistral path: reuse the same year-plan toolset/executor via MistralAgent
+          const agent = new MistralAgent({
+            apiKey: process.env.MISTRAL_API_KEY!,
+            model,
+            systemInstruction: systemPrompt,
+            maxTurns: 15,
+            tools: yearPlanGeminiTools,
+            executeTool: executeYearPlanTool,
+          });
+          const r = await agent.run(userPrompt, (m) => {
+            if (m.type === 'tool' && m.tool) {
+              const toolMessage = toolMessages[m.tool] || `Kör verktyg: ${m.tool}`;
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'tool', message: toolMessage, tool: m.tool })}\n\n`));
+            } else if (m.type === 'status' || m.type === 'thinking') {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: m.type, message: m.message })}\n\n`));
+            } else if (m.type === 'error') {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', message: m.message })}\n\n`));
+            }
+          });
+          finalResult = r.result;
+          toolCallsLog = r.toolCallsLog;
+          totalInputTokens = r.usage?.inputTokens || 0;
+          totalOutputTokens = r.usage?.outputTokens || 0;
+        } else {
+        // Gemini path: inline agent loop with year plan tools
+        const genAI = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY });
         const history: any[] = [];
         const maxTurns = 15;
 
@@ -139,7 +172,7 @@ export async function POST(req: NextRequest) {
             : history;
 
           const response = await genAI.models.generateContent({
-            model: YEARPLAN_MODEL,
+            model: model,
             contents,
             config: {
               systemInstruction: systemPrompt,
@@ -234,6 +267,7 @@ export async function POST(req: NextRequest) {
             break;
           }
         }
+        } // end Gemini path
 
         const result = finalResult;
         const usage = {
@@ -350,9 +384,9 @@ export async function POST(req: NextRequest) {
 
           writeFileSync(logFilePath, JSON.stringify({
             generatedAt: new Date().toISOString(),
-            backend: 'gemini-yearplan',
+            backend: `${provider}-yearplan`,
             prompt: userPrompt,
-            model: YEARPLAN_MODEL,
+            model: model,
             uploadedFile: uploadedFileName || null,
             toolCalls: toolCallsLog,
             summary: {
@@ -370,7 +404,7 @@ export async function POST(req: NextRequest) {
         const htmlBase64 = Buffer.from(presentationHTML).toString('base64');
 
         // Calculate cost
-        const cost = usage ? calculateCost(YEARPLAN_MODEL, usage.inputTokens, usage.outputTokens) : 0;
+        const cost = usage ? calculateCost(model, usage.inputTokens, usage.outputTokens) : 0;
 
         // Send completion
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({
@@ -383,8 +417,8 @@ export async function POST(req: NextRequest) {
             sections: presentationData?.sections || []
           },
           toolCallsLogUrl: `/logs/${logFileName}`,
-          backend: 'gemini-yearplan',
-          model: YEARPLAN_MODEL,
+          backend: `${provider}-yearplan`,
+          model: model,
           uploadedFile: uploadedFileName,
           usage: usage ? {
             inputTokens: usage.inputTokens,

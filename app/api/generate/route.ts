@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { GeminiAgent } from '@/lib/agents/gemini-agent';
+import { MistralAgent } from '@/lib/agents/mistral-agent';
 import { createDataAccessMcpServer } from '@/lib/mcp';
 import { generateSystemPrompt } from '@/lib/presentation/skills-loader';
 import { generateGeminiSystemPrompt } from '@/lib/presentation/gemini-skills-loader';
@@ -44,12 +45,13 @@ export async function POST(req: NextRequest) {
 
         // Determine provider based on model ID
         const provider = model.startsWith('claude-') ? 'claude' :
-          model.startsWith('gemini-') ? 'gemini' : null;
+          model.startsWith('gemini-') ? 'gemini' :
+          model.startsWith('mistral-') ? 'mistral' : null;
 
         if (!provider) {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({
             type: 'error',
-            message: `Unknown model: ${model}. Use a valid Claude or Gemini model ID.`
+            message: `Unknown model: ${model}. Use a valid Claude, Gemini or Mistral model ID.`
           })}\n\n`));
           controller.close();
           return;
@@ -60,6 +62,8 @@ export async function POST(req: NextRequest) {
           await generateWithClaude(controller, encoder, userPrompt, model);
         } else if (provider === 'gemini') {
           await generateWithGemini(controller, encoder, userPrompt, model, thinkingLevel);
+        } else if (provider === 'mistral') {
+          await generateWithMistral(controller, encoder, userPrompt, model);
         }
       } catch (error) {
         console.error('Error generating presentation:', error);
@@ -181,17 +185,98 @@ async function generateWithGemini(
     }
   });
 
+  await finishPresentation(controller, encoder, userPrompt, model, 'gemini', result, toolCallsLog, usage);
+}
+
+/**
+ * Generate presentation using Mistral (EU). Mirrors generateWithGemini but
+ * routes through MistralAgent. The system prompt generator is provider-neutral
+ * (despite its `Gemini` name) and the post-processing is shared.
+ */
+async function generateWithMistral(
+  controller: ReadableStreamDefaultController,
+  encoder: TextEncoder,
+  userPrompt: string,
+  model: string
+) {
+  if (!process.env.MISTRAL_API_KEY) {
+    controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+      type: 'error',
+      message: 'MISTRAL_API_KEY not configured. Add it to .env.local'
+    })}\n\n`));
+    controller.close();
+    return;
+  }
+
+  const modelDisplayName = model.replace('mistral-', 'Mistral ').replace(/-/g, ' ');
+
   controller.enqueue(encoder.encode(`data: ${JSON.stringify({
     type: 'status',
-    message: 'Parsar Geminis svar...'
+    message: `Initierar ${modelDisplayName}...`
   })}\n\n`));
 
-  // Log what Gemini returned for debugging
-  console.log('[Gemini Response] First 1000 chars:', result.substring(0, 1000));
-  console.log('[Gemini Response] Last 500 chars:', result.substring(Math.max(0, result.length - 500)));
-  console.log('[Gemini Response] Total length:', result.length);
+  const systemPrompt = await generateGeminiSystemPrompt(userPrompt);
 
-  // Parse Gemini's JSON response
+  controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+    type: 'status',
+    message: 'Ansluter till Mistral...'
+  })}\n\n`));
+
+  const agent = new MistralAgent({
+    apiKey: process.env.MISTRAL_API_KEY,
+    model,
+    systemInstruction: systemPrompt,
+    maxTurns: 25,
+  });
+
+  const toolMessages: Record<string, string> = {
+    'query_fbg_analytics': 'Hämtar finansiell data från databas...',
+    'search_directus_companies': 'Söker efter företag i CRM-systemet...',
+    'analyze_meetings': 'Analyserar möten från CRM...',
+    'get_directus_contacts': 'Hämtar kontaktpersoner från CRM...',
+  };
+
+  const { result, toolCallsLog, usage } = await agent.run(userPrompt, (message) => {
+    if (message.type === 'tool' && message.tool) {
+      const toolMessage = toolMessages[message.tool] || `Kör verktyg: ${message.tool}`;
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'tool', message: toolMessage, tool: message.tool })}\n\n`));
+    } else if (message.type === 'status' || message.type === 'thinking') {
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: message.type, message: message.message })}\n\n`));
+    } else if (message.type === 'error') {
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', message: message.message })}\n\n`));
+    }
+  });
+
+  await finishPresentation(controller, encoder, userPrompt, model, 'mistral', result, toolCallsLog, usage);
+}
+
+/**
+ * Shared post-processing for the tool-agent backends (Gemini + Mistral): parse
+ * the model's JSON, build the HTML deck, persist the tool-call log, and emit the
+ * SSE completion event. Both providers return the same { result, toolCallsLog,
+ * usage } shape, so this is provider-agnostic apart from the `backend` label.
+ */
+async function finishPresentation(
+  controller: ReadableStreamDefaultController,
+  encoder: TextEncoder,
+  userPrompt: string,
+  model: string,
+  backend: 'gemini' | 'mistral',
+  result: string,
+  toolCallsLog: ToolCallLog[],
+  usage?: { inputTokens: number; outputTokens: number; totalTokens: number }
+) {
+  controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+    type: 'status',
+    message: 'Parsar svaret...'
+  })}\n\n`));
+
+  // Log what the model returned for debugging
+  console.log(`[${backend} Response] First 1000 chars:`, result.substring(0, 1000));
+  console.log(`[${backend} Response] Last 500 chars:`, result.substring(Math.max(0, result.length - 500)));
+  console.log(`[${backend} Response] Total length:`, result.length);
+
+  // Parse the model's JSON response
   let presentationData;
   let presentationTitle = userPrompt;
   let sections: string[] = [];
@@ -267,11 +352,11 @@ async function generateWithGemini(
 
       controller.enqueue(encoder.encode(`data: ${JSON.stringify({
         type: 'status',
-        message: `Skapade ${validSections.length} slides från Gemini!`
+        message: `Skapade ${validSections.length} slides!`
       })}\n\n`));
     } else {
       // No JSON pattern found
-      console.log('No JSON pattern found in Gemini response');
+      console.log(`No JSON pattern found in ${backend} response`);
       console.log('Response starts with:', result.substring(0, 200));
 
       sections = [
@@ -324,7 +409,7 @@ async function generateWithGemini(
 
   // Save tool calls log
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const logFileName = `gemini-tool-calls-${timestamp}.json`;
+  const logFileName = `${backend}-tool-calls-${timestamp}.json`;
   const logFilePath = join(process.cwd(), 'public', 'logs', logFileName);
 
   try {
@@ -338,7 +423,7 @@ async function generateWithGemini(
 
     writeFileSync(logFilePath, JSON.stringify({
       generatedAt: new Date().toISOString(),
-      backend: 'gemini',
+      backend,
       prompt: userPrompt,
       model: model,
       toolCalls: toolCallsLog,
@@ -350,9 +435,9 @@ async function generateWithGemini(
       }
     }, null, 2));
 
-    console.log(`Gemini tool calls log saved to: ${logFilePath}`);
+    console.log(`${backend} tool calls log saved to: ${logFilePath}`);
   } catch (logError) {
-    console.error('Failed to save Gemini tool calls log:', logError);
+    console.error(`Failed to save ${backend} tool calls log:`, logError);
   }
 
   // Base64 encode HTML to safely send via SSE
@@ -372,7 +457,7 @@ async function generateWithGemini(
       sections: presentationData?.sections || []
     },
     toolCallsLogUrl: `/logs/${logFileName}`,
-    backend: 'gemini',
+    backend,
     model: model,
     usage: usage ? {
       inputTokens: usage.inputTokens,

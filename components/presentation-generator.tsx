@@ -160,6 +160,7 @@ export default function PresentationGenerator() {
         const formData = new FormData();
         formData.append('prompt', prompt);
         formData.append('file', uploadedFile);
+        if (selectedModel) formData.append('model', selectedModel);
 
         response = await fetch(endpoint, {
           method: 'POST',
@@ -173,8 +174,8 @@ export default function PresentationGenerator() {
           },
           body: JSON.stringify({
             prompt,
-            // Only send model for company mode
-            ...(mode === 'company' && { model: selectedModel }),
+            // Send the picked model for both company and yearplan modes
+            ...(selectedModel && { model: selectedModel }),
             ...(mode === 'company' && thinkingLevel !== 'off' && { thinkingLevel }),
           }),
         });

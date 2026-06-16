@@ -37,6 +37,20 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     inputPer1M: 0.30,
     outputPer1M: 2.50,
   },
+
+  // Mistral models (EU) — figures match chat-app/server/lib/pricing.ts
+  'mistral-medium-3.5': {
+    inputPer1M: 1.50,
+    outputPer1M: 7.50,
+  },
+  'mistral-large-latest': {
+    inputPer1M: 0.50,
+    outputPer1M: 1.50,
+  },
+  'mistral-small-latest': {
+    inputPer1M: 0.10,
+    outputPer1M: 0.30,
+  },
 };
 
 export function calculateCost(

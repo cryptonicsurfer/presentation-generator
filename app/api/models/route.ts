@@ -5,7 +5,7 @@ export const runtime = 'nodejs';
 export type ModelInfo = {
   id: string;
   name: string;
-  provider: 'claude' | 'gemini';
+  provider: 'claude' | 'gemini' | 'mistral';
   description: string;
 };
 
@@ -13,10 +13,17 @@ export async function GET() {
   try {
     const claudeModels = (process.env.CLAUDE_MODELS || '').split(',').filter(Boolean);
     const geminiModels = (process.env.GEMINI_MODELS || '').split(',').filter(Boolean);
+    const mistralModels = (process.env.MISTRAL_MODELS || '').split(',').filter(Boolean);
 
     const models: ModelInfo[] = [];
 
-    // Map Gemini models first (to respect .env.local order)
+    // Map Mistral models first → first entry is the default selection
+    for (const modelId of mistralModels) {
+      const info = getMistralModelInfo(modelId.trim());
+      if (info) models.push(info);
+    }
+
+    // Map Gemini models
     for (const modelId of geminiModels) {
       const info = getGeminiModelInfo(modelId.trim());
       if (info) models.push(info);
@@ -54,6 +61,33 @@ function getClaudeModelInfo(modelId: string): ModelInfo | null {
     id: modelId,
     name: info.name,
     provider: 'claude',
+    description: info.description
+  };
+}
+
+function getMistralModelInfo(modelId: string): ModelInfo | null {
+  const modelMap: Record<string, { name: string; description: string }> = {
+    'mistral-medium-3.5': {
+      name: 'Mistral Medium 3.5',
+      description: 'EU-modell, pålitlig verktygsanrop (Recommended)'
+    },
+    'mistral-large-latest': {
+      name: 'Mistral Large',
+      description: 'Större Mistral-modell'
+    },
+    'mistral-small-latest': {
+      name: 'Mistral Small',
+      description: 'Snabbast och billigast från Mistral'
+    },
+  };
+
+  const info = modelMap[modelId];
+  if (!info) return null;
+
+  return {
+    id: modelId,
+    name: info.name,
+    provider: 'mistral',
     description: info.description
   };
 }
