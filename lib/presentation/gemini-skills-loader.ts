@@ -520,34 +520,31 @@ Use these colors for a professional, brand-consistent look:
 
 # Output Format
 
-Return ONLY a JSON object with this exact structure:
+⚠️ DO NOT use JSON. DO NOT escape anything. Return PLAIN TEXT with these exact delimiters:
 
-\`\`\`json
-{
-  "title": "Presentation Title in Swedish",
-  "sections": [
-    "<section class=\\"slide\\">First content slide HTML...</section>",
-    "<section class=\\"slide\\">Second content slide HTML...</section>",
-    "<section class=\\"slide\\">Third content slide HTML...</section>",
-    "... (10-15 slides total)"
-  ]
-}
+\`\`\`
+===TITLE===
+Presentation Title in Swedish
+===SLIDE===
+<section class="slide">First content slide HTML...</section>
+===SLIDE===
+<section class="slide">Second content slide HTML...</section>
+===SLIDE===
+<section class="slide">Third content slide HTML...</section>
+===END===
 \`\`\`
 
-IMPORTANT:
-- Do NOT include title slide or thank you slide in sections (they're added automatically)
+RULES:
+- Begin with \`===TITLE===\` on its own line, then the Swedish title on the next line.
+- Begin EVERY content slide with \`===SLIDE===\` on its own line, then the raw \`<section>...</section>\` HTML.
+- Finish with \`===END===\` on its own line.
+- Write the HTML EXACTLY as-is: real double quotes ("), real newlines, NO backslash-escaping, NO \\n, NO \\". The delimiters mean you never have to escape anything.
+- Do NOT wrap the output in \`\`\`json, \`\`\`html, or any code fence — output the delimiters and HTML directly.
+- Do NOT include the title slide or thank-you slide (they are added automatically).
 - CREATE 10-15 CONTENT SLIDES (not just 3-4!)
 - ⚠️ Each section MUST include <img src="{{LOGO_SVART}}" alt="Falkenbergs kommun" class="slide-logo">
-- Ensure all HTML is valid and well-formed
-- Include trend slides, comparison tables, and analytical insights
-
-⚠️ CRITICAL JSON FORMATTING:
-- ALL double quotes inside HTML strings MUST be escaped as \\"
-- Quotes in Swedish text like "Hela vägen" become \\"Hela vägen\\"
-- Quotes in HTML attributes like class="slide" become class=\\"slide\\"
-- Use single quotes (') for Swedish text when possible to avoid escaping
-- Example: Instead of "Hela vägen"-konceptet, write 'Hela vägen'-konceptet
-- Alternative: Use HTML entities &quot; instead of \\" if needed
+- Ensure all HTML is valid and well-formed.
+- Include trend slides, comparison tables, and analytical insights.
 
 # Example Query Flow for Company Report
 

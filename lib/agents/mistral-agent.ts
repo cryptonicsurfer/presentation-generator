@@ -184,7 +184,7 @@ export class MistralAgent {
           messages,
           tools: mistralTools,
           toolChoice: 'auto',
-          maxTokens: 8192,
+          maxTokens: 16384,
         }, callback);
 
         const usage = response.usage;
@@ -269,13 +269,13 @@ export class MistralAgent {
         messages.push({
           role: 'user',
           content:
-            'You have reached the maximum number of tool calls. Based on all the data you have collected, NOW generate the final JSON output as instructed. Do not call any more tools.',
+            'You have reached the maximum number of tool calls. Based on all the data you have collected, NOW generate the final presentation in the delimiter format (===TITLE=== / ===SLIDE=== / ===END===) exactly as instructed. Do not call any more tools.',
         });
         const response = await this.complete({
           model: this.config.model,
           messages,
           toolChoice: 'none',
-          maxTokens: 8192,
+          maxTokens: 16384,
         }, callback);
         const usage = response.usage;
         if (usage) {

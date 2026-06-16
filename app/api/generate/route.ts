@@ -27,6 +27,66 @@ type ToolCallLog = {
   error?: string;
 };
 
+/** Escape text for safe injection into an HTML <pre> (debug fallback slide). */
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/**
+ * Parse a model's presentation output into { title, sections } where `sections`
+ * is an array of raw <section>...</section> HTML strings.
+ *
+ * Primary contract is the delimiter format (===TITLE=== / ===SLIDE=== / ===END===),
+ * which needs no escaping and can't be broken by quotes or newlines inside the HTML
+ * — the failure mode we hit with Mistral emitting HTML-in-JSON. Falls back to the
+ * legacy JSON ({ title, sections: [...] }) format, repaired with jsonrepair, for
+ * backward compatibility. Returns null when nothing parseable is found.
+ */
+function parsePresentationOutput(raw: string): { title?: string; sections: string[] } | null {
+  if (!raw) return null;
+
+  // --- Delimiter format (preferred) ---
+  if (raw.includes('===SLIDE===')) {
+    // Strip a stray wrapping code fence if the model added one anyway.
+    const text = raw.replace(/^\s*```[a-z]*\s*/i, '').replace(/```\s*$/, '');
+    const parts = text.split('===SLIDE===');
+
+    const titleMatch = parts[0].match(/===TITLE===\s*([\s\S]*)/);
+    const title = titleMatch ? titleMatch[1].trim() || undefined : undefined;
+
+    const sections = parts
+      .slice(1)
+      .map((s) => s.split('===END===')[0].trim())
+      .filter(Boolean);
+
+    if (sections.length > 0) return { title, sections };
+  }
+
+  // --- Legacy JSON format (fallback) ---
+  // Greedy `[\s\S]*` so we grab the WHOLE object up to the last brace, not a
+  // truncated fragment (the old non-greedy regex caused "Unterminated string").
+  const jsonMatch = raw.match(/```json\s*([\s\S]*?)\s*```/) || raw.match(/\{[\s\S]*"sections"[\s\S]*\}/);
+  if (!jsonMatch) return null;
+
+  const jsonStr = jsonMatch[1] || jsonMatch[0];
+  let data: any;
+  try {
+    data = JSON.parse(jsonStr);
+  } catch {
+    try {
+      data = JSON.parse(jsonrepair(jsonStr));
+    } catch {
+      return null;
+    }
+  }
+
+  const sections = (data.sections || [])
+    .map((s: any) => (typeof s === 'string' ? s : s && typeof s.slide === 'string' ? s.slide : null))
+    .filter((s: any): s is string => typeof s === 'string');
+
+  return { title: data.title, sections };
+}
+
 export async function POST(req: NextRequest) {
   const encoder = new TextEncoder();
 
@@ -276,132 +336,53 @@ async function finishPresentation(
   console.log(`[${backend} Response] Last 500 chars:`, result.substring(Math.max(0, result.length - 500)));
   console.log(`[${backend} Response] Total length:`, result.length);
 
-  // Parse the model's JSON response
-  let presentationData;
+  // Parse the model's response (delimiter format, with legacy-JSON fallback)
   let presentationTitle = userPrompt;
   let sections: string[] = [];
+  let parsedSections: string[] = [];
+  const backendLabel = backend.charAt(0).toUpperCase() + backend.slice(1);
 
-  try {
-    // Try to parse JSON from Gemini's response
-    // First try: Match ```json code blocks
-    let jsonMatch = result.match(/```json\s*([\s\S]*?)\s*```/);
+  const parsed = parsePresentationOutput(result);
 
-    if (!jsonMatch) {
-      // Second try: Find JSON object containing "sections"
-      jsonMatch = result.match(/\{[\s\S]*?"sections"[\s\S]*?\}/);
-    }
+  if (parsed && parsed.sections.length > 0) {
+    presentationTitle = parsed.title || userPrompt;
+    parsedSections = parsed.sections;
 
-    if (jsonMatch) {
-      let jsonStr = jsonMatch[1] || jsonMatch[0];
+    sections = [
+      generateTitleSlide(presentationTitle),
+      ...parsedSections,
+      generateThankYouSlide(),
+    ];
 
-      // Try to parse - if it fails, we'll use jsonrepair
-      try {
-        presentationData = JSON.parse(jsonStr);
-      } catch (parseError) {
-        // JSON parse failed - use jsonrepair to fix common issues
-        console.log('Initial JSON parse failed, using jsonrepair...', parseError);
+    controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+      type: 'status',
+      message: `Skapade ${parsedSections.length} slides!`
+    })}\n\n`));
+  } else {
+    // Nothing parseable — fallback presentation that surfaces the raw output.
+    console.log(`No parseable presentation output from ${backend}`);
+    console.log('Response starts with:', result.substring(0, 200));
 
-        try {
-          // jsonrepair can fix unescaped quotes, missing commas, etc.
-          const repairedJson = jsonrepair(jsonStr);
-          presentationData = JSON.parse(repairedJson);
-          console.log('JSON successfully repaired!');
-        } catch (repairError) {
-          console.log('jsonrepair failed, trying to extract object...', repairError);
-
-          // Last resort: try to find just the object part more carefully
-          const objMatch = jsonStr.match(/(\{[\s\S]*\})/);
-          if (objMatch) {
-            try {
-              const repairedObj = jsonrepair(objMatch[1]);
-              presentationData = JSON.parse(repairedObj);
-            } catch {
-              throw parseError; // Re-throw original error if nothing works
-            }
-          } else {
-            throw parseError;
-          }
-        }
-      }
-
-      presentationTitle = presentationData.title || userPrompt;
-
-      // Extract and validate sections - handle both string format and object format
-      const validSections = (presentationData.sections || [])
-        .map((section: any, index: number) => {
-          // If section is already a string, use it
-          if (typeof section === 'string') {
-            return section;
-          }
-          // If section is an object with 'slide' property, extract it
-          if (typeof section === 'object' && section.slide && typeof section.slide === 'string') {
-            console.log(`[Generate] Section ${index} is object with slide property, extracting...`);
-            return section.slide;
-          }
-          // Invalid format
-          console.error(`[Generate] Section ${index} has invalid format! Type: ${typeof section}`, section);
-          return null;
-        })
-        .filter((section: any) => section !== null);
-
-      sections = [
-        generateTitleSlide(presentationTitle),
-        ...validSections,
-        generateThankYouSlide(),
-      ];
-
-      controller.enqueue(encoder.encode(`data: ${JSON.stringify({
-        type: 'status',
-        message: `Skapade ${validSections.length} slides!`
-      })}\n\n`));
-    } else {
-      // No JSON pattern found
-      console.log(`No JSON pattern found in ${backend} response`);
-      console.log('Response starts with:', result.substring(0, 200));
-
-      sections = [
-        generateTitleSlide(userPrompt),
-        `<section class="slide bg-white items-center justify-center px-16">
-          <img src="https://kommun.falkenberg.se/document/om-kommunen/grafisk-profil/kommunens-logotyper/liggande-logotyper-foer-tryck/1609-falkenbergskommun-logo-svart-ligg"
-               alt="Falkenbergs kommun" class="slide-logo">
-          <div class="max-w-6xl w-full">
-            <h2 class="text-5xl font-bold text-gray-900 mb-8">Ingen JSON hittades</h2>
-            <p class="text-lg text-gray-700 mb-4">Gemini returnerade inte förväntad JSON-format.</p>
-            <div class="text-sm text-gray-600 mt-4 p-4 bg-gray-50 rounded overflow-auto max-h-96">
-              <pre>${result.substring(0, 2000)}</pre>
-            </div>
-          </div>
-        </section>`,
-        generateThankYouSlide(),
-      ];
-
-      controller.enqueue(encoder.encode(`data: ${JSON.stringify({
-        type: 'status',
-        message: 'Ingen strukturerad data från Gemini, skapar fallback-presentation'
-      })}\n\n`));
-    }
-  } catch (error) {
-    console.error('Error parsing Gemini presentation data:', error);
-    console.error('Error details:', (error as Error).message);
-    console.error('Error stack:', (error as Error).stack);
-
-    // Error fallback with more details
     sections = [
       generateTitleSlide(userPrompt),
       `<section class="slide bg-white items-center justify-center px-16">
         <img src="https://kommun.falkenberg.se/document/om-kommunen/grafisk-profil/kommunens-logotyper/liggande-logotyper-foer-tryck/1609-falkenbergskommun-logo-svart-ligg"
              alt="Falkenbergs kommun" class="slide-logo">
         <div class="max-w-6xl w-full">
-          <h2 class="text-5xl font-bold text-gray-900 mb-8">Fel vid parsning</h2>
-          <p class="text-lg text-gray-700 mb-4">Gemini svarade, men formatet kunde inte tolkas.</p>
-          <p class="text-sm text-red-600 mb-4">Fel: ${(error as Error).message}</p>
+          <h2 class="text-5xl font-bold text-gray-900 mb-8">Kunde inte tolka svaret</h2>
+          <p class="text-lg text-gray-700 mb-4">${backendLabel} svarade, men formatet kunde inte tolkas.</p>
           <div class="text-sm text-gray-600 mt-4 p-4 bg-gray-50 rounded overflow-auto max-h-96">
-            <pre>${result.substring(0, 1000)}</pre>
+            <pre>${escapeHtml(result.substring(0, 2000))}</pre>
           </div>
         </div>
       </section>`,
       generateThankYouSlide(),
     ];
+
+    controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+      type: 'status',
+      message: `Ingen strukturerad data från ${backendLabel}, skapar fallback-presentation`
+    })}\n\n`));
   }
 
   // Generate final HTML
@@ -454,7 +435,7 @@ async function finishPresentation(
     slideCount: sections.length,
     presentationData: {
       title: presentationTitle,
-      sections: presentationData?.sections || []
+      sections: parsedSections
     },
     toolCallsLogUrl: `/logs/${logFileName}`,
     backend,
@@ -654,21 +635,18 @@ async function generateWithClaude(
         }
 
         try {
-          const jsonMatch = claudeResponse.match(/```json\s*([\s\S]*?)\s*```/) ||
-            claudeResponse.match(/\{[\s\S]*?"sections"[\s\S]*?\}/);
+          const parsed = parsePresentationOutput(claudeResponse);
 
-          if (jsonMatch) {
-            const jsonStr = jsonMatch[1] || jsonMatch[0];
-            const presentationData = JSON.parse(jsonStr);
-
+          if (parsed && parsed.sections.length > 0) {
+            const title = parsed.title || userPrompt;
             const sections = [
-              generateTitleSlide(presentationData.title || userPrompt),
-              ...(presentationData.sections || []),
+              generateTitleSlide(title),
+              ...parsed.sections,
               generateThankYouSlide(),
             ];
 
-            presentationHTML = generatePresentationHTML(presentationData.title || userPrompt, sections);
-            presentationTitle = presentationData.title || userPrompt;
+            presentationHTML = generatePresentationHTML(title, sections);
+            presentationTitle = title;
           } else {
             const sections = [
               generateTitleSlide(userPrompt),
